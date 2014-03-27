@@ -1,0 +1,134 @@
+<head>
+  <title>js xm</title>
+  <script>
+
+var _note_names = ["C-", "C#", "D-", "D#", "E-", "F-", "F#", "G-", "G#", "A-", "A#", "B-"];
+function prettify_note(note) {
+  if (note == -1) return "---";
+  return _note_names[note%12] + ~~(note/12);
+}
+
+function prettify_number(num) {
+  if (num == -1) return "--";
+  if (num < 10) return "0" + num;
+  return num;
+}
+
+function prettify_effect(t, p) {
+  if (t == -1) t = "-"; else t = t.toString(16);
+  if (p == -1) p = "--";
+  else if (p < 16) p = '0' + p.toString(16);
+  else p = p.toString(16);
+  return "" + t + p
+}
+
+function prettify_notedata(note, inst, vol, efftype, effparam) {
+  return (prettify_note(note) + " " + prettify_number(inst) + " "
+    + prettify_number(vol) + " " 
+    + prettify_effect(efftype, effparam));
+}
+
+function playXM(arrayBuf) {
+  var dv = new DataView(arrayBuf);
+  window.dv = dv;
+
+  var name = "";
+  for (var i = 17; i < 37; i++) {
+    var c = dv.getUint8(i);
+    if (c == 0) break;
+    name += String.fromCharCode(c);
+  }
+  var hlen = dv.getUint32(0x3c, true) + 0x3c;
+  var songlen = dv.getUint16(0x40, true);
+  var looppos = dv.getUint16(0x42, true);
+  var nchan = dv.getUint16(0x44, true);
+  var npat = dv.getUint16(0x46, true);
+  var ninst = dv.getUint16(0x48, true);
+  var flags = dv.getUint16(0x4a, true);
+  var tempo = dv.getUint16(0x4c, true);
+  var bpm = dv.getUint16(0x4e, true);
+  console.log("header len " + hlen);
+
+  console.log("songlen %d, %d channels, %d patterns, %d instruments", songlen, nchan, npat, ninst);
+  console.log("loop @%d", looppos);
+  console.log("flags=%d tempo %d bpm %d", flags, tempo, bpm);
+
+  songpats = [];
+  for (var i = 0; i < songlen; i++) {
+    songpats.push(dv.getUint8(0x50 + i));
+  }
+  console.log("song patterns: ", songpats);
+
+  var idx = hlen;
+  var patterns = [];
+  for (var i = 0; i < 1; i++) {
+    var pattern = []
+    var patheaderlen = dv.getUint32(idx, true);
+    var patrows = dv.getUint16(idx + 5, true);
+    var patsize = dv.getUint16(idx + 7, true);
+    console.log("pattern %d: %d bytes, %d rows", i, patsize, patrows);
+    idx += 9;
+    for (var j = 0; j < patrows; j++) {
+      row = [];
+      pretty_row = [];
+      for (var k = 0; k < nchan; k++) {
+        var byte0 = dv.getUint8(idx); idx++;
+        var note = -1, inst = -1, vol = -1, efftype = -1, effparam = -1;
+        if (byte0 & 0x80) {
+          if (byte0 & 0x01) {
+            note = dv.getUint8(idx); idx++;
+          }
+          if (byte0 & 0x02) {
+            inst = dv.getUint8(idx); idx++;
+          }
+          if (byte0 & 0x04) {
+            vol = dv.getUint8(idx); idx++;
+          }
+          if (byte0 & 0x08) {
+            efftype = dv.getUint8(idx); idx++;
+          }
+          if (byte0 & 0x10) {
+            effparam = dv.getUint8(idx); idx++;
+          }
+        } else {
+          note = byte0;
+          inst = dv.getUint8(idx); idx++;
+          vol = dv.getUint8(idx); idx++;
+          efftype = dv.getUint8(idx); idx++;
+          effparam = dv.getUint8(idx); idx++;
+        }
+        pretty_row.push(prettify_notedata(note, inst, vol, efftype, effparam));
+        row.push([note, inst, vol, efftype, effparam]);
+      }
+      console.log(pretty_row.join("  "));
+      pattern.push(row);
+    }
+    patterns.push(pattern);
+  }
+
+  var debug = document.getElementById("debug");
+  console.log("loaded \"" + name + "\"");
+  debug.innerHTML = name;
+}
+
+var xmReq = new XMLHttpRequest();
+xmReq.open("GET", "kamel.xm", true);
+xmReq.responseType = "arraybuffer";
+xmReq.onload = function (xmEvent) {
+  var arrayBuffer = xmReq.response;
+  if (arrayBuffer) {
+    playXM(arrayBuffer);
+  }
+}
+xmReq.send(null);
+  </script>
+</head>
+<body>
+<pre>
+todo:
+ - load xm using XHR
+</pre>
+<pre id='debug'>
+</pre>
+</body>
+
