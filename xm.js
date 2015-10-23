@@ -194,12 +194,19 @@ function audio_cb(e) {
       if (volL < 0) volL = 0;
       if (volR < 0) volR = 0;
       if (volR == 0 && volL == 0)
-        break;
+        continue;
       var k = channelinfo[j].off;
       var dk = channelinfo[j].doff;
       // console.log(j, offset, channelinfo[j]);
       for (var i = offset; i < offset+tickduration; i++) {
-        var si = samp[k|0];  // TODO: bilinear filtering
+        var kk = k|0;
+        var si = samp[kk];
+        // bilinear filtering
+        var sj = si;
+        if (kk < sample_end-1)
+          sj = samp[kk+1];
+        var t = k - kk;
+        si = t * sj + (1 - t) * si;
         dataL[i] += volL * si;
         dataR[i] += volR * si;
         k += dk;
@@ -293,7 +300,7 @@ function playXM(arrayBuf) {
         var note = -1, inst = -1, vol = -1, efftype = -1, effparam = -1;
         if (byte0 & 0x80) {
           if (byte0 & 0x01) {
-            note = dv.getUint8(idx); idx++;
+            note = dv.getUint8(idx) - 1; idx++;
           }
           if (byte0 & 0x02) {
             inst = dv.getUint8(idx); idx++;
