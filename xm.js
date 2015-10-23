@@ -1,7 +1,7 @@
 var _note_names = ["C-", "C#", "D-", "D#", "E-", "F-", "F#", "G-", "G#", "A-", "A#", "B-"];
 function prettify_note(note) {
-  if (note <= 0) return "---";
-  if (note == 97) return "^^^";
+  if (note < 0) return "---";
+  if (note == 96) return "^^^";
   note += 11;
   return _note_names[note%12] + ~~(note/12);
 }
@@ -36,9 +36,28 @@ function getstring(dv, offset, len) {
   return str.join('');
 }
 
-channelinfo = []
+var channelinfo = [];
+var instruments = [];
+var tempo = 4;
 
-cur_songpos = -1, cur_pat = -1, cur_row = 64, cur_ticksamp = 0;
+function GetEnvelope(env, ticks) {
+  // TODO: optimize, maybe
+  var y0;
+  for (var i = 0; i < env.length; i += 2) {
+    y0 = env[i+1];
+    if (ticks < env[i]) {
+      var x0 = env[i-2];
+      var y0 = env[i-1];
+      var dx = env[i] - x0;
+      var dy = env[i+1] - y0;
+      return y0 + (ticks - x0) * dy / dx;
+    }
+  }
+  return y0;
+}
+
+var cur_songpos = -1, cur_pat = -1, cur_row = 64, cur_ticksamp = 0;
+var cur_tick = 6;
 function next_row(f_smp) {
   if (cur_row >= 64) {
     cur_row = 0;
@@ -50,27 +69,94 @@ function next_row(f_smp) {
   var p = patterns[cur_pat];
   var r = p[cur_row];
   cur_row++;
-  for (var i = 0; i < cur_row.length; i++) {
+  pretty_row = [];
+  for (var i = 0; i < r.length; i++) {
+    pretty_row.push(prettify_notedata(r[i][0], r[i][1], r[i][2], r[i][3], r[i][4]));
     // instrument trigger
-    if (r[i][1]) channelinfo[i].inst = r[i][1];
+    if (r[i][1] != -1) {
+      var inst = instruments[r[i][1] - 1];
+      if (inst !== undefined) {
+        channelinfo[i].inst = inst;
+        // retrigger?
+        channelinfo[i].off = 0;
+        channelinfo[i].release = 0;
+        channelinfo[i].envtick = 0;
+        // new instrument doesn ot reset volume!
+      } else {
+        // console.log("invalid inst", r[i][1], instruments.length);
+      }
+    }
     // note trigger
-    if (r[i][0]) {
-      if (r[i][0] == 97) {
+    if (r[i][0] != -1) {
+      if (r[i][0] == 96) {
         // release note, FIXME once envelopes are implemented
+        channelinfo[i].release = 1;
       } else {
         // assume linear frequency table (flags header & 1 == 1)
+        // is this true in kamel.xm?
         var inst = channelinfo[i].inst;
-        var period = 7680 - r[i][0]*64 - instruments[inst].fine*0.5;
-        var freq = 8363 * ((4608 - period) / 768);
+        if (inst === undefined) {
+          continue;
+        }
+        // wtf is this?!
+        // var period = 7680 - r[i][0]*64 - inst.fine*0.5;
+        // var freq = 8363 * Math.pow(2, (4608 - period) / 768);
+        var note = r[i][0] + inst.note;
+        var freq = 8363 * Math.pow(2, note/12.0 + inst.fine/(12*128.0) - 4);
         channelinfo[i].doff = freq / f_smp;
         channelinfo[i].off = 0;
+        channelinfo[i].release = 0;
+        channelinfo[i].envtick = 0;
+        // console.log("channel", i, r[i][0], channelinfo[i]);
+        // if there's an instrument and a note, set the volume
+        if (r[i][0] != -1) {
+          channelinfo[i].volL = inst.vol;
+          channelinfo[i].volR = inst.vol;
+        }
+      }
+    }
+    if (r[i][2] != -1) {
+      // FIXME: panning
+      var v = r[i][2];
+      if (v < 0x10) {
+        console.log("channel", i, "invalid volume", v.toString(16));
+      } else if (v <= 0x50) {
+        channelinfo[i].volL = v - 0x10;
+        channelinfo[i].volR = v - 0x10;
+      } else {
+        console.log("channel", i, "volume effect", v.toString(16));
       }
     }
   }
+  console.log(pretty_row.join("  "));
+  var debug = document.getElementById("debug");
+  debug.innerHTML = 'pat ' + cur_pat + ' row ' + (cur_row-1);
 }
 
 function next_tick(f_smp) {
-  // blah
+  cur_tick++;
+  if (cur_tick >= tempo) {
+    cur_tick = 0;
+    next_row(f_smp);
+  }
+  for (var j = 0; j < nchan; j++) {
+    var inst = channelinfo[j].inst;
+    if (inst === undefined) continue;
+    if (inst.env_vol !== undefined) {
+      channelinfo[j].env_vol = GetEnvelope(inst.env_vol, channelinfo[j].envtick);
+      if (inst.env_vol_type & 2) {  // sustain loop?
+        // if we're sustaining a note, leave env_vol alone
+        if (channelinfo[j].release == 0) {
+          if (channelinfo[j].envtick >= inst.env_vol[inst.env_vol_sustain*2]) {
+            continue;
+          }
+        }
+      }
+      channelinfo[j].envtick++;
+    } else {
+      channelinfo[j].env_vol = 64;
+    }
+  }
 }
 
 function audio_cb(e) {
@@ -78,8 +164,10 @@ function audio_cb(e) {
   var buflen = e.outputBuffer.length;
   var dataL = e.outputBuffer.getChannelData(0);
   var dataR = e.outputBuffer.getChannelData(1);
+  dataL.fill(0);
+  dataR.fill(0);
   var offset = 0;
-  var ticklen = f_smp * 2.5 / bpm;
+  var ticklen = 0|(f_smp * 2.5 / bpm);
     
   while(buflen > 0) {
     if (cur_ticksamp >= ticklen) {
@@ -87,15 +175,76 @@ function audio_cb(e) {
       cur_ticksamp -= ticklen;
     }
     var tickduration = Math.min(buflen, ticklen - cur_ticksamp);
-    for (var i = 0; i < tickduration; i++) {
-      for (var j = 0; j < nchan; j++) {
+    for (var j = 0; j < nchan; j++) {
+      var inst = channelinfo[j].inst;
+      if (inst === undefined) continue;
+      var samp = inst.sampledata;
+      var sample_end = inst.len;
+      var looplen = 0;
+      var loop = false;
+      if (inst.type & 3) {
+        loop = true;
+        looplen = inst.looplen;
+        sample_end = looplen + inst.loop;
       }
+      var samplen = inst.len;
+      var env_vol = channelinfo[j].env_vol / 64.0;
+      var volL = env_vol * channelinfo[j].volL / 64.0;
+      var volR = env_vol * channelinfo[j].volR / 64.0;
+      if (volL < 0) volL = 0;
+      if (volR < 0) volR = 0;
+      if (volR == 0 && volL == 0)
+        break;
+      var k = channelinfo[j].off;
+      var dk = channelinfo[j].doff;
+      // console.log(j, offset, channelinfo[j]);
+      for (var i = offset; i < offset+tickduration; i++) {
+        var si = samp[k|0];  // TODO: bilinear filtering
+        dataL[i] += volL * si;
+        dataR[i] += volR * si;
+        k += dk;
+        if (k >= sample_end) {  // TODO: implement pingpong looping
+          if (loop) {
+            k -= looplen;
+          } else {
+            // kill sample
+            channelinfo[j].inst = undefined;
+            break;
+          }
+        }
+      }
+      channelinfo[j].off = k;
+      channelinfo[j].doff = dk;
     }
-
+    offset += tickduration;
     cur_ticksamp += tickduration;
     buflen -= tickduration;
   }
-  console.log("buflen %d f_smp %d", buflen, f_smp);
+}
+
+function ConvertSample(array, bits) {
+  var len = array.length;
+  var acc = 0;
+  if (bits == 0) {  // 8 bit sample
+    var samp = new Float32Array(len);
+    for (var k = 0; k < len; k++) {
+      acc += array[k];
+      var b = acc&255;
+      if (b & 128) b = b-256;
+      samp[k] = (b - 128) / 128.0;
+    }
+    return samp;
+  } else {
+    len /= 2;
+    var samp = new Float32Array(len);
+    for (var k = 0; k < len; k++) {
+      acc += array[k*2] + (array[k*2 + 1] << 8);
+      var b = acc&65535;
+      if (b & 32768) b = b-65536;
+      samp[k] = b / 32768.0;
+    }
+    return samp;
+  }
 }
 
 function playXM(arrayBuf) {
@@ -159,7 +308,9 @@ function playXM(arrayBuf) {
             effparam = dv.getUint8(idx); idx++;
           }
         } else {
-          note = byte0;
+          // byte0 is note from 1..96 or 0 for nothing or 97 for release
+          // so we subtract 1 so that C-0 is stored as 0
+          note = byte0 - 1;
           inst = dv.getUint8(idx); idx++;
           vol = dv.getUint8(idx); idx++;
           efftype = dv.getUint8(idx); idx++;
@@ -175,12 +326,20 @@ function playXM(arrayBuf) {
     patterns.push(pattern);
   }
   
-  instruments = []
   // now load instruments
   for (i = 0; i < ninst; i++) {
     var hdrsiz = dv.getUint32(idx, true);
     var instname = getstring(dv, idx+0x4, 22);
     var nsamp = dv.getUint16(idx+0x1b, true);
+    var env_nvol = dv.getUint8(idx+225);
+    var env_vol_type = dv.getUint8(idx+233);
+    var env_vol_sustain = dv.getUint8(idx+227);
+    var env_vol_loop_start = dv.getUint8(idx+228);
+    var env_vol_loop_end = dv.getUint8(idx+229);
+    env_vol = [];
+    for (var j = 0; j < env_nvol*2; j++) {
+      env_vol.push(dv.getUint16(idx+129+j*2, true));
+    }
     if (nsamp > 0) {
       // FIXME: ignoring keymaps for now and assuming 1 sample / instrument
       // var keymap = getarray(dv, idx+0x21);
@@ -203,24 +362,37 @@ function playXM(arrayBuf) {
             j, samplen, sampname, samploop, samplooplen, sampvol);
         console.log("           type %d note %s finetune %d pan %d",
             samptype, prettify_note(sampnote), sampfinetune, samppan);
+        console.log("           vol env", env_vol, env_vol_sustain,
+            env_vol_loop_start, env_vol_loop_end, "type", env_vol_type);
         idx += samplen + samphdrsiz;
       }
-      instruments.push({
+      inst = {
         'name': instname,
-        'off': sampleoffset, 'len': samplen, 'loop': samploop,
+        'len': samplen, 'loop': samploop,
         'looplen': samplooplen, 'note': sampnote, 'fine': sampfinetune,
-        'pan': samppan})
+        'pan': samppan, 'type': samptype, 'vol': sampvol,
+        'fine': sampfinetune,
+        'sampledata': ConvertSample(new Uint8Array(arrayBuf, sampleoffset, samplen), samptype & 4),
+      };
+      if (env_vol_type) {
+        inst.env_vol = env_vol;
+        inst.env_vol_type = env_vol_type;
+        inst.env_vol_sustain = env_vol_sustain;
+        inst.env_vol_loop_start = env_vol_loop_start;
+        inst.env_vol_loop_end = env_vol_loop_end;
+      }
+      instruments.push(inst);
     } else {
       instruments.push(null);
     }
   }
 
-  audioctx = new webkitAudioContext();
+  audioctx = new AudioContext();
   gainNode = audioctx.createGain();
-  gainNode.gain.value = 1.0;  // master volume
+  gainNode.gain.value = 0.2;  // master volume
   jsNode = audioctx.createScriptProcessor(4096, 0, 2);
   jsNode.onaudioprocess = audio_cb;
-  // jsNode.connect(gainNode);
+  jsNode.connect(gainNode);
 
   var debug = document.getElementById("debug");
   console.log("loaded \"" + name + "\"");
