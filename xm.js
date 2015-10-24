@@ -202,11 +202,14 @@ function audio_cb(e) {
     for (var j = 0; j < nchan; j++) {
       var ch = channelinfo[j];
       var inst = ch.inst;
-      if (inst === undefined) continue;
-      var samp = inst.sampledata;
-      var sample_end = inst.len;
-      var looplen = 0;
+      var samp, sample_end;
       var loop = false;
+      var looplen = 0;
+      if (inst === undefined) {
+        continue;
+      }
+      samp = inst.sampledata;
+      sample_end = inst.len;
       if ((inst.type & 3) == 1) { // todo: support pingpong
         loop = true;
         looplen = inst.looplen;
@@ -234,8 +237,10 @@ function audio_cb(e) {
         var t = k - kk;
         si = t * sj + (1 - t) * si;
         */
-        dataL[i] += Filter(volL * si, ch.filter, ch.filterstate[0]);
-        dataR[i] += Filter(volR * si, ch.filter, ch.filterstate[1]);
+        vl = Filter(volL, ch.popfilter, ch.popfilterstate[0]);
+        vr = Filter(volR, ch.popfilter, ch.popfilterstate[1]);
+        dataL[i] += Filter(vl * si, ch.filter, ch.filterstate[0]);
+        dataR[i] += Filter(vr * si, ch.filter, ch.filterstate[1]);
         k += dk;
         if (k >= sample_end) {  // TODO: implement pingpong looping
           if (loop) {
@@ -243,6 +248,11 @@ function audio_cb(e) {
           } else {
             // kill sample
             ch.inst = undefined;
+            for (i++; i < offset+tickduration; i++) {
+              // fill rest of buffer with filtered silence to avoid a pop
+              dataL[i] += Filter(0, ch.popfilter, ch.filterstate[0]);
+              dataR[i] += Filter(0, ch.popfilter, ch.filterstate[1]);
+            }
             break;
           }
         }
@@ -297,7 +307,9 @@ function playXM(arrayBuf) {
   bpm = dv.getUint16(0x4e, true);
   for (var i = 0; i < nchan; i++) {
     channelinfo.push({
-      filterstate: [new Float32Array(3), new Float32Array(3)]
+      filterstate: [new Float32Array(3), new Float32Array(3)],
+      popfilter: FilterCoeffs(200.0 / 44100.0),
+      popfilterstate: [new Float32Array(3), new Float32Array(3)]
     })
   }
   console.log("header len " + hlen);
@@ -425,7 +437,7 @@ function playXM(arrayBuf) {
 
   audioctx = new AudioContext();
   gainNode = audioctx.createGain();
-  gainNode.gain.value = 0.2;  // master volume
+  gainNode.gain.value = 0.1;  // master volume
   jsNode = audioctx.createScriptProcessor(4096, 0, 2);
   jsNode.onaudioprocess = audio_cb;
   jsNode.connect(gainNode);
