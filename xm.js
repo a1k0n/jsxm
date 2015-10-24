@@ -12,17 +12,21 @@ function prettify_number(num) {
   return num;
 }
 
+function prettify_volume(num) {
+  if (num < 0x10) return "--";
+  return num.toString(16);
+}
+
 function prettify_effect(t, p) {
-  if (t == -1) t = "-"; else t = t.toString(16);
-  if (p == -1) p = "--";
-  else if (p < 16) p = '0' + p.toString(16);
+  t = t.toString(16);
+  if (p < 16) p = '0' + p.toString(16);
   else p = p.toString(16);
-  return "" + t + p
+  return t + p
 }
 
 function prettify_notedata(note, inst, vol, efftype, effparam) {
   return (prettify_note(note) + " " + prettify_number(inst) + " "
-    + prettify_number(vol) + " "
+    + prettify_volume(vol) + " "
     + prettify_effect(efftype, effparam));
 }
 
@@ -78,8 +82,15 @@ function Filter(x, coef, state) {
   return y;
 }
 
+function UpdateChannelNote(ch, note, f_smp) {
+  var freq = 8363 * Math.pow(2, note/12.0 + ch.inst.fine/(12*128.0) - 4);
+  ch.doff = freq / f_smp;
+  ch.filter = FilterCoeffs(ch.doff / 2);
+}
+
 var cur_songpos = -1, cur_pat = -1, cur_row = 64, cur_ticksamp = 0;
 var cur_tick = 6;
+var patdisplay = [];
 function next_row(f_smp) {
   if (cur_row >= 64) {
     cur_row = 0;
@@ -93,16 +104,17 @@ function next_row(f_smp) {
   cur_row++;
   pretty_row = [];
   for (var i = 0; i < r.length; i++) {
+    var ch = channelinfo[i];
     pretty_row.push(prettify_notedata(r[i][0], r[i][1], r[i][2], r[i][3], r[i][4]));
     // instrument trigger
     if (r[i][1] != -1) {
       var inst = instruments[r[i][1] - 1];
       if (inst !== undefined) {
-        channelinfo[i].inst = inst;
+        ch.inst = inst;
         // retrigger?
-        channelinfo[i].off = 0;
-        channelinfo[i].release = 0;
-        channelinfo[i].envtick = 0;
+        ch.off = 0;
+        ch.release = 0;
+        ch.envtick = 0;
         // new instrument doesn ot reset volume!
       } else {
         // console.log("invalid inst", r[i][1], instruments.length);
@@ -112,11 +124,11 @@ function next_row(f_smp) {
     if (r[i][0] != -1) {
       if (r[i][0] == 96) {
         // release note, FIXME once envelopes are implemented
-        channelinfo[i].release = 1;
+        ch.release = 1;
       } else {
         // assume linear frequency table (flags header & 1 == 1)
         // is this true in kamel.xm?
-        var inst = channelinfo[i].inst;
+        var inst = ch.inst;
         if (inst === undefined) {
           continue;
         }
@@ -124,36 +136,45 @@ function next_row(f_smp) {
         // var period = 7680 - r[i][0]*64 - inst.fine*0.5;
         // var freq = 8363 * Math.pow(2, (4608 - period) / 768);
         var note = r[i][0] + inst.note;
-        var freq = 8363 * Math.pow(2, note/12.0 + inst.fine/(12*128.0) - 4);
-        channelinfo[i].doff = freq / f_smp;
-        channelinfo[i].off = 0;
-        channelinfo[i].release = 0;
-        channelinfo[i].envtick = 0;
-        channelinfo[i].filter = FilterCoeffs(channelinfo[i].doff / 2);
-        // console.log("channel", i, r[i][0], channelinfo[i]);
+        ch.note = note;
+        ch.off = 0;
+        ch.release = 0;
+        ch.envtick = 0;
+        UpdateChannelNote(ch, note, f_smp);
+        // console.log("channel", i, r[i][0], ch);
         // if there's an instrument and a note, set the volume
         if (r[i][0] != -1) {
-          channelinfo[i].volL = inst.vol;
-          channelinfo[i].volR = inst.vol;
+          var p = (inst.pan - 128) / 128.0;
+          ch.volL = Math.sqrt(1 - p) * inst.vol;
+          ch.volR = Math.sqrt(1 + p) * inst.vol;
         }
       }
     }
-    if (r[i][2] != -1) {
+    if (r[i][2] != -1) {  // volume column
       // FIXME: panning
       var v = r[i][2];
       if (v < 0x10) {
         console.log("channel", i, "invalid volume", v.toString(16));
       } else if (v <= 0x50) {
-        channelinfo[i].volL = v - 0x10;
-        channelinfo[i].volR = v - 0x10;
-      } else {
-        console.log("channel", i, "volume effect", v.toString(16));
+        ch.volL = v - 0x10;
+        ch.volR = v - 0x10;
       }
     }
+
+    ch.effect = r[i][3];
+    ch.effectdata = r[i][4];
+    // TODO: process initial effect tick for effects which need it
+
   }
-  console.log(pretty_row.join("  "));
   var debug = document.getElementById("debug");
   debug.innerHTML = 'pat ' + cur_pat + ' row ' + (cur_row-1);
+
+  var pat = document.getElementById("pattern");
+  patdisplay.push(pretty_row.join("  "));
+  if (patdisplay.length > 16) {
+    patdisplay.shift();
+  }
+  pat.innerHTML = patdisplay.join("\n");
 }
 
 function next_tick(f_smp) {
@@ -165,6 +186,12 @@ function next_tick(f_smp) {
   for (var j = 0; j < nchan; j++) {
     var ch = channelinfo[j];
     var inst = ch.inst;
+    // process effects
+    if (ch.effect == 0 && ch.effectdata != 0) {
+      var arpeggio = [0, ch.effectdata>>4, ch.effectdata&15];
+      var note = ch.note + arpeggio[cur_tick % 3];
+      UpdateChannelNote(ch, note, f_smp);
+    }
     if (inst === undefined) continue;
     if (inst.env_vol !== undefined) {
       ch.env_vol = GetEnvelope(inst.env_vol, ch.envtick);
@@ -338,7 +365,7 @@ function playXM(arrayBuf) {
       pretty_row = [];
       for (var k = 0; k < nchan; k++) {
         var byte0 = dv.getUint8(idx); idx++;
-        var note = -1, inst = -1, vol = -1, efftype = -1, effparam = -1;
+        var note = -1, inst = -1, vol = -1, efftype = 0, effparam = 0;
         if (byte0 & 0x80) {
           if (byte0 & 0x01) {
             note = dv.getUint8(idx) - 1; idx++;
