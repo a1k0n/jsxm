@@ -74,6 +74,8 @@ function FilterCoeffs(f_c) {
   return [gain, 2*c, -c*c - s*s];
 }
 
+popfilter = FilterCoeffs(200.0 / 44100.0);
+
 function Filter(x, coef, state) {
   var y = coef[0] * (x + state[0]) + coef[1]*state[1] + coef[2]*state[2];
   state[0] = x;
@@ -290,20 +292,12 @@ function audio_cb(e) {
       var dk = ch.doff;
       // console.log(j, offset, ch);
       for (var i = offset; i < offset+tickduration; i++) {
-        var kk = k|0;
-        var si = samp[kk];
-        /*
-        // bilinear filtering
-        var sj = si;
-        if (kk < sample_end-1)
-          sj = samp[kk+1];
-        var t = k - kk;
-        si = t * sj + (1 - t) * si;
-        */
-        vl = Filter(volL, ch.popfilter, ch.popfilterstate[0]);
-        vr = Filter(volR, ch.popfilter, ch.popfilterstate[1]);
-        dataL[i] += Filter(vl * si, ch.filter, ch.filterstate[0]);
-        dataR[i] += Filter(vr * si, ch.filter, ch.filterstate[1]);
+        var si = samp[k|0];
+        si = Filter(si, ch.filter, ch.filterstate);
+        var vl = Filter(volL, popfilter, ch.popfilterstate[0]);
+        var vr = Filter(volR, popfilter, ch.popfilterstate[1]);
+        dataL[i] += vl * si;
+        dataR[i] += vr * si;
         k += dk;
         if (k >= sample_end) {  // TODO: implement pingpong looping
           if (loop) {
@@ -311,10 +305,13 @@ function audio_cb(e) {
           } else {
             // kill sample
             ch.inst = undefined;
-            for (i++; i < offset+tickduration; i++) {
+            // ramp down with the pop filter
+            var rampend = Math.min(offset+tickduration, i+200);
+            for (i++; i < rampend; i++) {
               // fill rest of buffer with filtered silence to avoid a pop
-              dataL[i] += Filter(0, ch.popfilter, ch.filterstate[0]);
-              dataR[i] += Filter(0, ch.popfilter, ch.filterstate[1]);
+              var s = Filter(0, popfilter, ch.filterstate);
+              dataL[i] += vl * s;
+              dataR[i] += vr * s;
             }
             break;
           }
@@ -370,7 +367,7 @@ function playXM(arrayBuf) {
   bpm = dv.getUint16(0x4e, true);
   for (var i = 0; i < nchan; i++) {
     channelinfo.push({
-      filterstate: [new Float32Array(3), new Float32Array(3)],
+      filterstate: new Float32Array(3),
       popfilter: FilterCoeffs(200.0 / 44100.0),
       popfilterstate: [new Float32Array(3), new Float32Array(3)],
       vol: 0,
