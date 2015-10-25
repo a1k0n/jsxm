@@ -82,10 +82,19 @@ function Filter(x, coef, state) {
   return y;
 }
 
-function UpdateChannelNote(ch, note, f_smp) {
-  var freq = 8363 * Math.pow(2, note/12.0 + ch.inst.fine/(12*128.0) - 4);
+function UpdateChannelPeriod(ch, period, f_smp) {
+  var freq = 8363 * Math.pow(2, (4608 - period) / 768);
   ch.doff = freq / f_smp;
   ch.filter = FilterCoeffs(ch.doff / 2);
+}
+
+function PeriodForNote(ch, note) {
+  return 7680 - note*64 - ch.inst.fine*0.5;
+}
+
+function UpdateChannelNote(ch, note, f_smp) {
+  ch.period = PeriodForNote(ch, note);
+  UpdateChannelPeriod(ch, ch.period, f_smp);
 }
 
 var cur_songpos = -1, cur_pat = -1, cur_row = 64, cur_ticksamp = 0;
@@ -105,6 +114,7 @@ function next_row(f_smp) {
   pretty_row = [];
   for (var i = 0; i < r.length; i++) {
     var ch = channelinfo[i];
+    ch.update = false;
     pretty_row.push(prettify_notedata(r[i][0], r[i][1], r[i][2], r[i][3], r[i][4]));
     // instrument trigger
     if (r[i][1] != -1) {
@@ -120,6 +130,7 @@ function next_row(f_smp) {
         // console.log("invalid inst", r[i][1], instruments.length);
       }
     }
+    var triggernote = false;
     // note trigger
     if (r[i][0] != -1) {
       if (r[i][0] == 96) {
@@ -132,22 +143,12 @@ function next_row(f_smp) {
         if (inst === undefined) {
           continue;
         }
-        // wtf is this?!
-        // var period = 7680 - r[i][0]*64 - inst.fine*0.5;
-        // var freq = 8363 * Math.pow(2, (4608 - period) / 768);
         var note = r[i][0] + inst.note;
         ch.note = note;
-        ch.off = 0;
-        ch.release = 0;
-        ch.envtick = 0;
-        UpdateChannelNote(ch, note, f_smp);
-        // console.log("channel", i, r[i][0], ch);
+        triggernote = true;
         // if there's an instrument and a note, set the volume
-        if (r[i][0] != -1) {
-          var p = (inst.pan - 128) / 128.0;
-          ch.volL = Math.sqrt(1 - p) * inst.vol;
-          ch.volR = Math.sqrt(1 + p) * inst.vol;
-        }
+        ch.pan = inst.pan;
+        ch.vol = inst.vol;
       }
     }
     if (r[i][2] != -1) {  // volume column
@@ -156,15 +157,33 @@ function next_row(f_smp) {
       if (v < 0x10) {
         console.log("channel", i, "invalid volume", v.toString(16));
       } else if (v <= 0x50) {
-        ch.volL = v - 0x10;
-        ch.volR = v - 0x10;
+        ch.vol = v - 0x10;
       }
     }
 
     ch.effect = r[i][3];
     ch.effectdata = r[i][4];
     // TODO: process initial effect tick for effects which need it
-
+    if (ch.effect == 1 && ch.effectdata != 0) {
+      ch.slideupspeed = ch.effectdata;
+    }
+    if (ch.effect == 2 && ch.effectdata != 0) {
+      ch.slidedownspeed = ch.effectdata;
+    }
+    if (ch.effect == 3 || ch.effect == 5) {
+      if (r[i][0] != -1)
+        ch.periodtarget = PeriodForNote(ch, ch.note);
+      if (ch.effect == 3 && ch.effectdata != 0) {
+        ch.portaspeed = ch.effectdata;
+      }
+      triggernote = false;
+    }
+    if (triggernote) {
+      ch.off = 0;
+      ch.release = 0;
+      ch.envtick = 0;
+      UpdateChannelNote(ch, note, f_smp);
+    }
   }
   var debug = document.getElementById("debug");
   debug.innerHTML = 'pat ' + cur_pat + ' row ' + (cur_row-1);
@@ -191,6 +210,22 @@ function next_tick(f_smp) {
       var arpeggio = [0, ch.effectdata>>4, ch.effectdata&15];
       var note = ch.note + arpeggio[cur_tick % 3];
       UpdateChannelNote(ch, note, f_smp);
+    }
+    if (ch.effect == 1 && ch.slideupspeed !== undefined) {
+      ch.period -= ch.slideupspeed;
+      UpdateChannelPeriod(ch, ch.period, f_smp);
+    }
+    if (ch.effect == 2 && ch.slidedownspeed !== undefined) {
+      ch.period += ch.slidedownspeed;
+      UpdateChannelPeriod(ch, ch.period, f_smp);
+    }
+    if (ch.effect == 3 && ch.periodtarget !== undefined && ch.portaspeed !== undefined) {
+      if (ch.period > ch.periodtarget) {
+        ch.period = Math.max(ch.periodtarget, ch.period - ch.portaspeed);
+      } else {
+        ch.period = Math.min(ch.periodtarget, ch.period + ch.portaspeed);
+      }
+      UpdateChannelPeriod(ch, ch.period, f_smp);
     }
     if (inst === undefined) continue;
     if (inst.env_vol !== undefined) {
@@ -244,8 +279,9 @@ function audio_cb(e) {
       }
       var samplen = inst.len;
       var env_vol = ch.env_vol / 64.0;
-      var volL = env_vol * ch.volL / 64.0;
-      var volR = env_vol * ch.volR / 64.0;
+      var p = ch.pan - 128;
+      var volL = env_vol * (128 - p) * ch.vol / 8192.0;
+      var volR = env_vol * (128 + p) * ch.vol / 8192.0;
       if (volL < 0) volL = 0;
       if (volR < 0) volR = 0;
       if (volR == 0 && volL == 0)
@@ -336,7 +372,9 @@ function playXM(arrayBuf) {
     channelinfo.push({
       filterstate: [new Float32Array(3), new Float32Array(3)],
       popfilter: FilterCoeffs(200.0 / 44100.0),
-      popfilterstate: [new Float32Array(3), new Float32Array(3)]
+      popfilterstate: [new Float32Array(3), new Float32Array(3)],
+      vol: 0,
+      pan: 128
     })
   }
   console.log("header len " + hlen);
@@ -394,7 +432,7 @@ function playXM(arrayBuf) {
         pretty_row.push(prettify_notedata(note, inst, vol, efftype, effparam));
         row.push([note, inst, vol, efftype, effparam]);
       }
-      if (i == 0)
+      if (i == 12)
         console.log(pretty_row.join("  "));
       pattern.push(row);
     }
