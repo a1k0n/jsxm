@@ -75,14 +75,7 @@ function FilterCoeffs(f_c) {
 }
 
 popfilter = FilterCoeffs(200.0 / 44100.0);
-
-function Filter(x, coef, state) {
-  var y = coef[0] * (x + state[0]) + coef[1]*state[1] + coef[2]*state[2];
-  state[0] = x;
-  state[2] = state[1];
-  state[1] = y;
-  return y;
-}
+popfilter_alpha = 0.9837;
 
 function UpdateChannelPeriod(ch, period, f_smp) {
   var freq = 8363 * Math.pow(2, (4608 - period) / 768);
@@ -213,15 +206,15 @@ function next_tick(f_smp) {
       var note = ch.note + arpeggio[cur_tick % 3];
       UpdateChannelNote(ch, note, f_smp);
     }
-    if (ch.effect == 1 && ch.slideupspeed !== undefined) {
+    if (ch.effect == 1 && cur_tick != 0 && ch.slideupspeed !== undefined) {
       ch.period -= ch.slideupspeed;
       UpdateChannelPeriod(ch, ch.period, f_smp);
     }
-    if (ch.effect == 2 && ch.slidedownspeed !== undefined) {
+    if (ch.effect == 2 && cur_tick != 0 && ch.slidedownspeed !== undefined) {
       ch.period += ch.slidedownspeed;
       UpdateChannelPeriod(ch, ch.period, f_smp);
     }
-    if (ch.effect == 3 && ch.periodtarget !== undefined && ch.portaspeed !== undefined) {
+    if (ch.effect == 3 && cur_tick != 0 && ch.periodtarget !== undefined && ch.portaspeed !== undefined) {
       if (ch.period > ch.periodtarget) {
         ch.period = Math.max(ch.periodtarget, ch.period - ch.portaspeed);
       } else {
@@ -292,12 +285,15 @@ function audio_cb(e) {
       var dk = ch.doff;
       // console.log(j, offset, ch);
       for (var i = offset; i < offset+tickduration; i++) {
-        var si = samp[k|0];
-        si = Filter(si, ch.filter, ch.filterstate);
-        var vl = Filter(volL, popfilter, ch.popfilterstate[0]);
-        var vr = Filter(volR, popfilter, ch.popfilterstate[1]);
-        dataL[i] += vl * si;
-        dataR[i] += vr * si;
+        var s = samp[k|0];
+        var si = ch.filter[0] * (s + ch.filterstate[0]) + ch.filter[1]*ch.filterstate[1] + ch.filter[2]*ch.filterstate[2];
+        ch.filterstate[2] = ch.filterstate[1]; ch.filterstate[1] = si; ch.filterstate[0] = s;
+        ch.vL = popfilter_alpha * ch.vL + (1 - popfilter_alpha) * (volL + ch.vLprev) * 0.5;
+        ch.vR = popfilter_alpha * ch.vR + (1 - popfilter_alpha) * (volR + ch.vRprev) * 0.5;
+        ch.vLprev = volL;
+        ch.vRprev = volR;
+        dataL[i] += ch.vL * si;
+        dataR[i] += ch.vR * si;
         k += dk;
         if (k >= sample_end) {  // TODO: implement pingpong looping
           if (loop) {
@@ -309,9 +305,10 @@ function audio_cb(e) {
             var rampend = Math.min(offset+tickduration, i+200);
             for (i++; i < rampend; i++) {
               // fill rest of buffer with filtered silence to avoid a pop
-              var s = Filter(0, popfilter, ch.filterstate);
-              dataL[i] += vl * s;
-              dataR[i] += vr * s;
+              var si = popfilter[0] * (ch.filterstate[0]) + popfilter[1]*ch.filterstate[1] + popfilter[2]*ch.filterstate[2];
+              ch.filterstate[2] = ch.filterstate[1]; ch.filterstate[1] = si; ch.filterstate[0] = 0;
+              dataL[i] += ch.vL * si;
+              dataR[i] += ch.vR * si;
             }
             break;
           }
@@ -371,7 +368,9 @@ function playXM(arrayBuf) {
       popfilter: FilterCoeffs(200.0 / 44100.0),
       popfilterstate: [new Float32Array(3), new Float32Array(3)],
       vol: 0,
-      pan: 128
+      pan: 128,
+      vL: 0, vR: 0,   // left right volume envelope followers (changes per sample)
+      vLprev: 0, vRprev: 0,
     })
   }
   console.log("header len " + hlen);
