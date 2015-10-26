@@ -1,6 +1,8 @@
 var _note_names = ["C-", "C#", "D-", "D#", "E-", "F-", "F#", "G-", "G#", "A-", "A#", "B-"];
 var f_smp = 44100;  // updated by play callback, default value here
 
+audioContext = window.AudioContext || window.webkitAudioContext;
+
 function prettify_note(note) {
   if (note < 0) return "---";
   if (note == 96) return "^^^";
@@ -264,8 +266,18 @@ function audio_cb(e) {
   var buflen = e.outputBuffer.length;
   var dataL = e.outputBuffer.getChannelData(0);
   var dataR = e.outputBuffer.getChannelData(1);
-  dataL.fill(0);
-  dataR.fill(0);
+
+  // backward compat w/ no array.fill
+  if (dataL.fill === undefined) {
+    for (var i = 0; i < buflen; i++) {
+      dataL[i] = 0;
+      dataR[i] = 0;
+    }
+  } else {
+    dataL.fill(0);
+    dataR.fill(0);
+  }
+
   var offset = 0;
   var ticklen = 0|(f_smp * 2.5 / bpm);
   var VU = new Float32Array(nchan);
@@ -699,7 +711,7 @@ function playXM(arrayBuf) {
     }
   }
 
-  audioctx = new AudioContext();
+  audioctx = new audioContext();
   gainNode = audioctx.createGain();
   gainNode.gain.value = 0.1;  // master volume
   jsNode = audioctx.createScriptProcessor(4096, 0, 2);
