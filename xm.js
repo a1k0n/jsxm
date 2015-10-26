@@ -78,13 +78,13 @@ popfilter = FilterCoeffs(200.0 / 44100.0);
 popfilter_alpha = 0.9837;
 
 function UpdateChannelPeriod(ch, period, f_smp) {
-  var freq = 8363 * Math.pow(2, (4608 - period) / 768);
+  var freq = 8363 * Math.pow(2, (1152.0 - period) / 192.0);
   ch.doff = freq / f_smp;
   ch.filter = FilterCoeffs(ch.doff / 2);
 }
 
 function PeriodForNote(ch, note) {
-  return 7680 - note*64 - ch.inst.fine*0.5;
+  return 1920 - note*16 - ch.inst.fine / 8.0;
 }
 
 function UpdateChannelNote(ch, note, f_smp) {
@@ -116,10 +116,8 @@ function next_row(f_smp) {
       var inst = instruments[r[i][1] - 1];
       if (inst !== undefined) {
         ch.inst = inst;
-        // retrigger?
-        ch.off = 0;
-        ch.release = 0;
-        ch.envtick = 0;
+        // retrigger unless overridden below
+        triggernote = true;
         // new instrument doesn ot reset volume!
       } else {
         // console.log("invalid inst", r[i][1], instruments.length);
@@ -172,6 +170,12 @@ function next_row(f_smp) {
         ch.portaspeed = ch.effectdata;
       }
       triggernote = false;
+      if (ch.release) {
+        // reset envelopes if note was released but leave offset/pitch/etc
+        // alone
+        ch.envtick = 0;
+        ch.release = 0;
+      }
     }
     if (triggernote) {
       ch.off = 0;
@@ -285,6 +289,7 @@ function audio_cb(e) {
       var dk = ch.doff;
       // console.log(j, offset, ch);
       for (var i = offset; i < offset+tickduration; i++) {
+        if (ch.mute) break;
         var s = samp[k|0];
         var si = ch.filter[0] * (s + ch.filterstate[0]) + ch.filter[1]*ch.filterstate[1] + ch.filter[2]*ch.filterstate[2];
         ch.filterstate[2] = ch.filterstate[1]; ch.filterstate[1] = si; ch.filterstate[0] = s;
@@ -371,6 +376,7 @@ function playXM(arrayBuf) {
       pan: 128,
       vL: 0, vR: 0,   // left right volume envelope followers (changes per sample)
       vLprev: 0, vRprev: 0,
+      mute: 0,
     })
   }
   console.log("header len " + hlen);
