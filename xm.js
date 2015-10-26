@@ -1,4 +1,6 @@
 var _note_names = ["C-", "C#", "D-", "D#", "E-", "F-", "F#", "G-", "G#", "A-", "A#", "B-"];
+var f_smp = 44100;  // updated by play callback, default value here
+
 function prettify_note(note) {
   if (note < 0) return "---";
   if (note == 96) return "^^^";
@@ -77,7 +79,7 @@ function FilterCoeffs(f_c) {
 popfilter = FilterCoeffs(200.0 / 44100.0);
 popfilter_alpha = 0.9837;
 
-function UpdateChannelPeriod(ch, period, f_smp) {
+function UpdateChannelPeriod(ch, period) {
   var freq = 8363 * Math.pow(2, (1152.0 - period) / 192.0);
   ch.doff = freq / f_smp;
   ch.filter = FilterCoeffs(ch.doff / 2);
@@ -87,15 +89,15 @@ function PeriodForNote(ch, note) {
   return 1920 - note*16 - ch.inst.fine / 8.0;
 }
 
-function UpdateChannelNote(ch, note, f_smp) {
+function UpdateChannelNote(ch, note) {
   ch.period = PeriodForNote(ch, note);
-  UpdateChannelPeriod(ch, ch.period, f_smp);
+  UpdateChannelPeriod(ch, ch.period);
 }
 
 var cur_songpos = -1, cur_pat = -1, cur_row = 64, cur_ticksamp = 0;
 var cur_tick = 6;
 var patdisplay = [];
-function next_row(f_smp) {
+function next_row() {
   if (cur_row >= 64) {
     cur_row = 0;
     cur_songpos++;
@@ -156,18 +158,19 @@ function next_row(f_smp) {
 
     ch.effect = r[i][3];
     ch.effectdata = r[i][4];
-    // TODO: process initial effect tick for effects which need it
-    if (ch.effect == 1 && ch.effectdata != 0) {
-      ch.slideupspeed = ch.effectdata;
+    if (ch.effect < 16) {
+      ch.effectfn = effects_t1[ch.effect];
+      if (effects_t0[ch.effect](ch, ch.effectdata)) {
+        triggernote = false;
+      }
+    } else {
+      console.log("channel", i, "effect > 16", ch.effect);
     }
-    if (ch.effect == 2 && ch.effectdata != 0) {
-      ch.slidedownspeed = ch.effectdata;
-    }
+
+    // special handling for portamentos: don't trigger the note
     if (ch.effect == 3 || ch.effect == 5) {
-      if (r[i][0] != -1)
+      if (r[i][0] != -1) {
         ch.periodtarget = PeriodForNote(ch, ch.note);
-      if (ch.effect == 3 && ch.effectdata != 0) {
-        ch.portaspeed = ch.effectdata;
       }
       triggernote = false;
       if (ch.release) {
@@ -177,11 +180,13 @@ function next_row(f_smp) {
         ch.release = 0;
       }
     }
+
     if (triggernote) {
       ch.off = 0;
       ch.release = 0;
       ch.envtick = 0;
-      UpdateChannelNote(ch, note, f_smp);
+      ch.vibratopos = 0;
+      UpdateChannelNote(ch, note);
     }
   }
   var debug = document.getElementById("debug");
@@ -195,36 +200,17 @@ function next_row(f_smp) {
   pat.innerHTML = patdisplay.join("\n");
 }
 
-function next_tick(f_smp) {
+function next_tick() {
   cur_tick++;
   if (cur_tick >= tempo) {
     cur_tick = 0;
-    next_row(f_smp);
+    next_row();
   }
   for (var j = 0; j < nchan; j++) {
     var ch = channelinfo[j];
     var inst = ch.inst;
-    // process effects
-    if (ch.effect == 0 && ch.effectdata != 0) {
-      var arpeggio = [0, ch.effectdata>>4, ch.effectdata&15];
-      var note = ch.note + arpeggio[cur_tick % 3];
-      UpdateChannelNote(ch, note, f_smp);
-    }
-    if (ch.effect == 1 && cur_tick != 0 && ch.slideupspeed !== undefined) {
-      ch.period -= ch.slideupspeed;
-      UpdateChannelPeriod(ch, ch.period, f_smp);
-    }
-    if (ch.effect == 2 && cur_tick != 0 && ch.slidedownspeed !== undefined) {
-      ch.period += ch.slidedownspeed;
-      UpdateChannelPeriod(ch, ch.period, f_smp);
-    }
-    if (ch.effect == 3 && cur_tick != 0 && ch.periodtarget !== undefined && ch.portaspeed !== undefined) {
-      if (ch.period > ch.periodtarget) {
-        ch.period = Math.max(ch.periodtarget, ch.period - ch.portaspeed);
-      } else {
-        ch.period = Math.min(ch.periodtarget, ch.period + ch.portaspeed);
-      }
-      UpdateChannelPeriod(ch, ch.period, f_smp);
+    if (ch.effectfn) {
+      ch.effectfn(ch);
     }
     if (inst === undefined) continue;
     if (inst.env_vol !== undefined) {
@@ -245,7 +231,7 @@ function next_tick(f_smp) {
 }
 
 function audio_cb(e) {
-  var f_smp = audioctx.sampleRate;
+  f_smp = audioctx.sampleRate;
   var buflen = e.outputBuffer.length;
   var dataL = e.outputBuffer.getChannelData(0);
   var dataR = e.outputBuffer.getChannelData(1);
@@ -327,6 +313,122 @@ function audio_cb(e) {
     buflen -= tickduration;
   }
 }
+
+function eff_t0_0(ch, data) {
+  // nothing to do here, arpeggio will be done on ch.effectdata
+}
+
+function eff_t0_1(ch, data) {
+  if (data != 0) {
+    ch.slideupspeed = data;
+  }
+}
+
+function eff_t0_2(ch, data) {
+  if (data != 0) {
+    ch.slidedownspeed = data;
+  }
+}
+
+function eff_t0_3(ch, data) {
+  if (data != 0) {
+    ch.portaspeed = data;
+  }
+}
+
+function eff_t0_4(ch, data) {
+  if (data & 0x0f) {
+    ch.vibratodepth = data & 0x0f;
+  }
+  if (data >> 4) {
+    ch.vibratospeed = data >> 4;
+  }
+  eff_t1_4(ch, data);
+}
+
+
+function eff_t1_0(ch) {
+  if (ch.effectdata != 0) {
+    var arpeggio = [0, ch.effectdata>>4, ch.effectdata&15];
+    var note = ch.note + arpeggio[cur_tick % 3];
+    UpdateChannelNote(ch, note);
+  }
+}
+
+function eff_t1_1(ch) {
+  if (ch.slideupspeed !== undefined) {
+    ch.period -= ch.slideupspeed;
+    UpdateChannelPeriod(ch, ch.period);
+  }
+}
+
+function eff_t1_2(ch) {
+  if (ch.slidedownspeed !== undefined) {
+    ch.period += ch.slidedownspeed;
+    UpdateChannelPeriod(ch, ch.period);
+  }
+}
+
+function eff_t1_3(ch) {
+  if (ch.periodtarget !== undefined && ch.portaspeed !== undefined) {
+    if (ch.period > ch.periodtarget) {
+      ch.period = Math.max(ch.periodtarget, ch.period - ch.portaspeed);
+    } else {
+      ch.period = Math.min(ch.periodtarget, ch.period + ch.portaspeed);
+    }
+    UpdateChannelPeriod(ch, ch.period);
+  }
+}
+
+function eff_t1_4(ch) {
+  var v0 = Math.sin(ch.vibratopos * Math.PI / 32);
+  ch.vibratopos += ch.vibratospeed;
+  ch.vibratopos &= 63;
+  var v1 = Math.sin(ch.vibratopos * Math.PI / 32);
+  ch.period += (v1 - v0) * ch.vibratodepth;
+  console.log("vibrato", ch.vibratospeed, ch.vibratodepth, ch.period);
+  UpdateChannelPeriod(ch, ch.period);
+}
+
+function eff_unimplemented(ch, data) {}
+
+var effects_t0 = [  // effect functions on tick 0
+  eff_t0_0,
+  eff_t0_1,
+  eff_t0_2,
+  eff_t0_3,
+  eff_t0_4,
+  eff_unimplemented,  // 5
+  eff_unimplemented,  // 6
+  eff_unimplemented,  // 7
+  eff_unimplemented,  // 8
+  eff_unimplemented,  // 9
+  eff_unimplemented,  // a
+  eff_unimplemented,  // b
+  eff_unimplemented,  // c
+  eff_unimplemented,  // d
+  eff_unimplemented,  // e
+  eff_unimplemented,  // f
+];
+
+var effects_t1 = [  // effect functions on tick 1+
+  eff_t1_0,
+  eff_t1_1,
+  eff_t1_2,
+  eff_t1_3,
+  eff_t1_4,
+  eff_unimplemented,  // 5
+  eff_unimplemented,  // 6
+  eff_unimplemented,  // 7
+  eff_unimplemented,  // 8
+  eff_unimplemented,  // 9
+  eff_unimplemented,  // a
+  eff_unimplemented,  // b
+  eff_unimplemented,  // c
+  eff_unimplemented,  // d
+  eff_unimplemented,  // e
+  eff_unimplemented,  // f
+];
 
 function ConvertSample(array, bits) {
   var len = array.length;
