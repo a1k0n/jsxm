@@ -46,22 +46,6 @@ var channelinfo = [];
 var instruments = [];
 var tempo = 4;
 
-function GetEnvelope(env, ticks) {
-  // TODO: optimize, maybe
-  var y0;
-  for (var i = 0; i < env.length; i += 2) {
-    y0 = env[i+1];
-    if (ticks < env[i]) {
-      var x0 = env[i-2];
-      var y0 = env[i-1];
-      var dx = env[i] - x0;
-      var dy = env[i+1] - y0;
-      return y0 + (ticks - x0) * dy / dx;
-    }
-  }
-  return y0;
-}
-
 // Return 2-pole Butterworth lowpass filter coefficients for
 // center frequncy f_c (relative to sampling frequency)
 function FilterCoeffs(f_c) {
@@ -178,6 +162,8 @@ function next_row() {
         // alone
         ch.envtick = 0;
         ch.release = 0;
+        ch.env_vol = new EnvelopeFollower(inst.env_vol);
+        ch.env_pan = new EnvelopeFollower(inst.env_pan);
       }
     }
 
@@ -186,6 +172,8 @@ function next_row() {
       ch.release = 0;
       ch.envtick = 0;
       ch.vibratopos = 0;
+      ch.env_vol = new EnvelopeFollower(inst.env_vol);
+      ch.env_pan = new EnvelopeFollower(inst.env_pan);
       UpdateChannelNote(ch, note);
     }
   }
@@ -198,6 +186,59 @@ function next_row() {
     patdisplay.shift();
   }
   pat.innerHTML = patdisplay.join("\n");
+}
+
+function Envelope(points, type, sustain, loopstart, loopend) {
+  this.points = points;
+  this.type = type;
+  this.sustain = sustain;
+  this.loopstart = loopstart;
+  this.loopend = loopend;
+}
+
+Envelope.prototype.Get = function(ticks) {
+  // TODO: optimize follower with ptr
+  // or even do binary search here
+  var y0;
+  var env = this.points;
+  for (var i = 0; i < env.length; i += 2) {
+    y0 = env[i+1];
+    if (ticks < env[i]) {
+      var x0 = env[i-2];
+      var y0 = env[i-1];
+      var dx = env[i] - x0;
+      var dy = env[i+1] - y0;
+      return y0 + (ticks - x0) * dy / dx;
+    }
+  }
+  return y0;
+}
+
+function EnvelopeFollower(env) {
+  this.env = env;
+  this.tick = 0;
+}
+
+EnvelopeFollower.prototype.Tick = function(release) {
+  if (this.env === undefined) {
+    return 64;
+  }
+  var value = this.env.Get(this.tick);
+  if (this.env.type & 1) {  // sustain?
+    // if we're sustaining a note, stop advancing the tick counter
+    if (!release &&
+        this.tick >= this.env.points[this.env.sustain*2]) {
+      return this.env.points[this.env.sustain*2 + 1];
+    }
+  }
+  this.tick++;
+  if (this.env.type & 2) {  // envelope loop?
+    if (!release &&
+        this.tick > this.env.loopend) {
+      this.tick -= this.env.loopend - this.env.loopstart;
+    }
+  }
+  return value;
 }
 
 function next_tick() {
@@ -213,20 +254,8 @@ function next_tick() {
       ch.effectfn(ch);
     }
     if (inst === undefined) continue;
-    if (inst.env_vol !== undefined) {
-      ch.env_vol = GetEnvelope(inst.env_vol, ch.envtick);
-      if (inst.env_vol_type & 2) {  // sustain loop?
-        // if we're sustaining a note, leave env_vol alone
-        if (ch.release == 0) {
-          if (ch.envtick >= inst.env_vol[inst.env_vol_sustain*2]) {
-            continue;
-          }
-        }
-      }
-      ch.envtick++;
-    } else {
-      ch.env_vol = 64;
-    }
+    ch.volE = ch.env_vol.Tick(ch.release);
+    ch.panE = ch.env_pan.Tick(ch.release);
   }
 }
 
@@ -263,10 +292,11 @@ function audio_cb(e) {
         sample_end = looplen + inst.loop;
       }
       var samplen = inst.len;
-      var env_vol = ch.env_vol / 64.0;
-      var p = ch.pan - 128;
-      var volL = env_vol * (128 - p) * ch.vol / 8192.0;
-      var volR = env_vol * (128 + p) * ch.vol / 8192.0;
+      var volE = ch.volE / 64.0;
+      var panE = (ch.panE - 32);
+      var p = panE + ch.pan - 128;
+      var volL = volE * (128 - p) * ch.vol / 8192.0;
+      var volR = volE * (128 + p) * ch.vol / 8192.0;
       if (volL < 0) volL = 0;
       if (volR < 0) volR = 0;
       if (volR == 0 && volL == 0)
@@ -277,8 +307,17 @@ function audio_cb(e) {
       for (var i = offset; i < offset+tickduration; i++) {
         if (ch.mute) break;
         var s = samp[k|0];
-        var si = ch.filter[0] * (s + ch.filterstate[0]) + ch.filter[1]*ch.filterstate[1] + ch.filter[2]*ch.filterstate[2];
-        ch.filterstate[2] = ch.filterstate[1]; ch.filterstate[1] = si; ch.filterstate[0] = s;
+        // we low-pass filter here since we are resampling some arbitrary
+        // frequency to f_smp; this is an anti-aliasing filter and is
+        // implemented as an IIR butterworth filter (usually we'd use an FIR
+        // brick wall filter, but this is much simpler computationally and
+        // sounds fine)
+        var si = ch.filter[0] * (s + ch.filterstate[0]) +
+          ch.filter[1]*ch.filterstate[1] + ch.filter[2]*ch.filterstate[2];
+        ch.filterstate[2] = ch.filterstate[1];
+        ch.filterstate[1] = si; ch.filterstate[0] = s;
+        // we also low-pass filter volume changes with a simple one-zero,
+        // one-pole filter to avoid pops and clicks when volume changes.
         ch.vL = popfilter_alpha * ch.vL + (1 - popfilter_alpha) * (volL + ch.vLprev) * 0.5;
         ch.vR = popfilter_alpha * ch.vR + (1 - popfilter_alpha) * (volR + ch.vRprev) * 0.5;
         ch.vLprev = volL;
@@ -292,12 +331,19 @@ function audio_cb(e) {
           } else {
             // kill sample
             ch.inst = undefined;
-            // ramp down with the pop filter
+            // ramp down to zero with the pop filter
+            // if the sample ends right before the end of the tick (or the end
+            // of the buffer), we could still get a pop but *usually* it's
+            // hidden behind other changes in the tick... there's only so much
+            // we can do here, anyway.  i guess we could hold the dc offset...
             var rampend = Math.min(offset+tickduration, i+200);
             for (i++; i < rampend; i++) {
               // fill rest of buffer with filtered silence to avoid a pop
-              var si = popfilter[0] * (ch.filterstate[0]) + popfilter[1]*ch.filterstate[1] + popfilter[2]*ch.filterstate[2];
-              ch.filterstate[2] = ch.filterstate[1]; ch.filterstate[1] = si; ch.filterstate[0] = 0;
+              var si = popfilter[0] * (ch.filterstate[0]) +
+                popfilter[1]*ch.filterstate[1] +
+                popfilter[2]*ch.filterstate[2];
+              ch.filterstate[2] = ch.filterstate[1];
+              ch.filterstate[1] = si; ch.filterstate[0] = 0;
               dataL[i] += ch.vL * si;
               dataR[i] += ch.vR * si;
             }
@@ -568,9 +614,18 @@ function playXM(arrayBuf) {
     var env_vol_sustain = dv.getUint8(idx+227);
     var env_vol_loop_start = dv.getUint8(idx+228);
     var env_vol_loop_end = dv.getUint8(idx+229);
+    var env_npan = dv.getUint8(idx+226);
+    var env_pan_type = dv.getUint8(idx+234);
+    var env_pan_sustain = dv.getUint8(idx+230);
+    var env_pan_loop_start = dv.getUint8(idx+231);
+    var env_pan_loop_end = dv.getUint8(idx+232);
     env_vol = [];
     for (var j = 0; j < env_nvol*2; j++) {
       env_vol.push(dv.getUint16(idx+129+j*2, true));
+    }
+    env_pan = [];
+    for (var j = 0; j < env_npan*2; j++) {
+      env_pan.push(dv.getUint16(idx+177+j*2, true));
     }
     if (nsamp > 0) {
       // FIXME: ignoring keymaps for now and assuming 1 sample / instrument
@@ -607,11 +662,20 @@ function playXM(arrayBuf) {
         'sampledata': ConvertSample(new Uint8Array(arrayBuf, sampleoffset, samplen), samptype & 4),
       };
       if (env_vol_type) {
-        inst.env_vol = env_vol;
-        inst.env_vol_type = env_vol_type;
-        inst.env_vol_sustain = env_vol_sustain;
-        inst.env_vol_loop_start = env_vol_loop_start;
-        inst.env_vol_loop_end = env_vol_loop_end;
+        inst.env_vol = new Envelope(
+            env_vol,
+            env_vol_type,
+            env_vol_sustain,
+            env_vol_loop_start,
+            env_vol_loop_end);
+      }
+      if (env_pan_type) {
+        inst.env_pan = new Envelope(
+            env_pan,
+            env_pan_type,
+            env_pan_sustain,
+            env_pan_loop_start,
+            env_pan_loop_end);
       }
       instruments.push(inst);
     } else {
