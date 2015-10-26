@@ -314,29 +314,29 @@ function audio_cb(e) {
   }
 }
 
-function eff_t0_0(ch, data) {
+function eff_t0_0(ch, data) {  // arpeggio
   // nothing to do here, arpeggio will be done on ch.effectdata
 }
 
-function eff_t0_1(ch, data) {
+function eff_t0_1(ch, data) {  // pitch slide up
   if (data != 0) {
     ch.slideupspeed = data;
   }
 }
 
-function eff_t0_2(ch, data) {
+function eff_t0_2(ch, data) {  // pitch slide down
   if (data != 0) {
     ch.slidedownspeed = data;
   }
 }
 
-function eff_t0_3(ch, data) {
+function eff_t0_3(ch, data) {  // portamento
   if (data != 0) {
     ch.portaspeed = data;
   }
 }
 
-function eff_t0_4(ch, data) {
+function eff_t0_4(ch, data) {  // vibrato
   if (data & 0x0f) {
     ch.vibratodepth = data & 0x0f;
   }
@@ -346,8 +346,40 @@ function eff_t0_4(ch, data) {
   eff_t1_4(ch, data);
 }
 
+function eff_t0_a(ch, data) {  // volume slide
+  if (data) {
+    if (data & 0x0f) {
+      ch.volumeslide = -(data & 0x0f);
+    } else {
+      ch.volumeslide = data >> 4;
+    }
+  }
+}
 
-function eff_t1_0(ch) {
+function eff_unimplemented_t0(ch, data) {
+  console.log("unimplemented effect", ch.effect.toString(16), data.toString(16));
+}
+
+var effects_t0 = [  // effect functions on tick 0
+  eff_t0_0,
+  eff_t0_1,
+  eff_t0_2,
+  eff_t0_3,
+  eff_t0_4,
+  eff_unimplemented_t0,  // 5
+  eff_unimplemented_t0,  // 6
+  eff_unimplemented_t0,  // 7
+  eff_unimplemented_t0,  // 8
+  eff_unimplemented_t0,  // 9
+  eff_t0_a,
+  eff_unimplemented_t0,  // b
+  eff_unimplemented_t0,  // c
+  eff_unimplemented_t0,  // d
+  eff_unimplemented_t0,  // e
+  eff_unimplemented_t0,  // f
+];
+
+function eff_t1_0(ch) {  // arpeggio
   if (ch.effectdata != 0) {
     var arpeggio = [0, ch.effectdata>>4, ch.effectdata&15];
     var note = ch.note + arpeggio[cur_tick % 3];
@@ -355,21 +387,21 @@ function eff_t1_0(ch) {
   }
 }
 
-function eff_t1_1(ch) {
+function eff_t1_1(ch) {  // pitch slide up
   if (ch.slideupspeed !== undefined) {
     ch.period -= ch.slideupspeed;
     UpdateChannelPeriod(ch, ch.period);
   }
 }
 
-function eff_t1_2(ch) {
+function eff_t1_2(ch) {  // pitch slide down
   if (ch.slidedownspeed !== undefined) {
     ch.period += ch.slidedownspeed;
     UpdateChannelPeriod(ch, ch.period);
   }
 }
 
-function eff_t1_3(ch) {
+function eff_t1_3(ch) {  // portamento
   if (ch.periodtarget !== undefined && ch.portaspeed !== undefined) {
     if (ch.period > ch.periodtarget) {
       ch.period = Math.max(ch.periodtarget, ch.period - ch.portaspeed);
@@ -380,37 +412,20 @@ function eff_t1_3(ch) {
   }
 }
 
-function eff_t1_4(ch) {
-  var v0 = Math.sin(ch.vibratopos * Math.PI / 32);
+function eff_t1_4(ch) {  // vibrato
+  ch.period += Math.sin(ch.vibratopos * Math.PI / 32) * ch.vibratodepth;
+  UpdateChannelPeriod(ch, ch.period);
   ch.vibratopos += ch.vibratospeed;
   ch.vibratopos &= 63;
-  var v1 = Math.sin(ch.vibratopos * Math.PI / 32);
-  ch.period += (v1 - v0) * ch.vibratodepth;
-  console.log("vibrato", ch.vibratospeed, ch.vibratodepth, ch.period);
-  UpdateChannelPeriod(ch, ch.period);
 }
 
-function eff_unimplemented(ch, data) {}
+function eff_t1_a(ch) {  // volume slide
+  if (ch.volumeslide !== undefined) {
+    ch.vol = Math.max(0, Math.min(64, ch.vol + ch.volumeslide));
+  }
+}
 
-var effects_t0 = [  // effect functions on tick 0
-  eff_t0_0,
-  eff_t0_1,
-  eff_t0_2,
-  eff_t0_3,
-  eff_t0_4,
-  eff_unimplemented,  // 5
-  eff_unimplemented,  // 6
-  eff_unimplemented,  // 7
-  eff_unimplemented,  // 8
-  eff_unimplemented,  // 9
-  eff_unimplemented,  // a
-  eff_unimplemented,  // b
-  eff_unimplemented,  // c
-  eff_unimplemented,  // d
-  eff_unimplemented,  // e
-  eff_unimplemented,  // f
-];
-
+function eff_unimplemented() {}
 var effects_t1 = [  // effect functions on tick 1+
   eff_t1_0,
   eff_t1_1,
@@ -422,7 +437,7 @@ var effects_t1 = [  // effect functions on tick 1+
   eff_unimplemented,  // 7
   eff_unimplemented,  // 8
   eff_unimplemented,  // 9
-  eff_unimplemented,  // a
+  eff_t1_a,  // a
   eff_unimplemented,  // b
   eff_unimplemented,  // c
   eff_unimplemented,  // d
