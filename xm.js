@@ -268,6 +268,7 @@ function audio_cb(e) {
   dataR.fill(0);
   var offset = 0;
   var ticklen = 0|(f_smp * 2.5 / bpm);
+  var VU = new Float32Array(nchan);
 
   while(buflen > 0) {
     if (cur_ticksamp >= ticklen) {
@@ -303,6 +304,7 @@ function audio_cb(e) {
         continue;
       var k = ch.off;
       var dk = ch.doff;
+      var Vrms = 0;
       // console.log(j, offset, ch);
       for (var i = offset; i < offset+tickduration; i++) {
         if (ch.mute) break;
@@ -324,6 +326,7 @@ function audio_cb(e) {
         ch.vRprev = volR;
         dataL[i] += ch.vL * si;
         dataR[i] += ch.vR * si;
+        Vrms += ch.vL * ch.vR * si * si;
         k += dk;
         if (k >= sample_end) {  // TODO: implement pingpong looping
           if (loop) {
@@ -353,10 +356,23 @@ function audio_cb(e) {
       }
       ch.off = k;
       ch.doff = dk;
+      VU[j] += Vrms;
     }
     offset += tickduration;
     cur_ticksamp += tickduration;
     buflen -= tickduration;
+  }
+
+  // update VU meters
+  var canvas = document.getElementById("vu");
+  var ctx = canvas.getContext("2d");
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, 300, 64);
+  ctx.fillStyle = '#0f0';
+  for (var j = 0; j < nchan; j++) {
+    var rms = VU[j] / e.outputBuffer.length;
+    var y = -Math.log(rms)*10;
+    ctx.fillRect(j*16, y, 15, 64-y);
   }
 }
 
