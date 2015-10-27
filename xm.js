@@ -139,6 +139,15 @@ function next_row() {
         console.log("channel", i, "invalid volume", v.toString(16));
       } else if (v <= 0x50) {
         ch.vol = v - 0x10;
+      } else if (v >= 0x80 && v < 0x90) {  // fine volume slide down
+        ch.vol = Math.max(0, ch.vol - (v & 0x0f));
+      } else if (v >= 0x90 && v < 0xa0) {  // fine volume slide up
+        ch.vol = Math.min(64, ch.vol + (v & 0x0f));
+      } else if (v >= 0xc0 && v < 0xd0) {  // set panning
+        ch.pan = 16 * (v & 0x0f);
+        console.log("channel", i, "pan", ch.pan);
+      } else {
+        console.log("channel", i, "volume effect", v.toString(16));
       }
     }
 
@@ -221,9 +230,9 @@ function EnvelopeFollower(env) {
   this.tick = 0;
 }
 
-EnvelopeFollower.prototype.Tick = function(release) {
+EnvelopeFollower.prototype.Tick = function(release, defaultval) {
   if (this.env === undefined) {
-    return 64;
+    return defaultval;
   }
   var value = this.env.Get(this.tick);
   if (this.env.type & 1) {  // sustain?
@@ -256,8 +265,8 @@ function next_tick() {
       ch.effectfn(ch);
     }
     if (inst === undefined) continue;
-    ch.volE = ch.env_vol.Tick(ch.release);
-    ch.panE = ch.env_pan.Tick(ch.release);
+    ch.volE = ch.env_vol.Tick(ch.release, 64);
+    ch.panE = ch.env_pan.Tick(ch.release, 32);
   }
 }
 
@@ -296,9 +305,9 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
     sample_end = looplen + inst.loop;
   }
   var samplen = inst.len;
-  var volE = ch.volE / 64.0;
-  var panE = (ch.panE - 32);
-  var p = panE + ch.pan - 128;
+  var volE = ch.volE / 64.0;    // current volume envelope
+  var panE = 4*(ch.panE - 32);  // current panning envelope
+  var p = panE + ch.pan - 128;  // final pan
   var volL = volE * (128 - p) * ch.vol / 8192.0;
   var volR = volE * (128 + p) * ch.vol / 8192.0;
   if (volL < 0) volL = 0;
@@ -309,7 +318,9 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   var dk = ch.doff;
   var Vrms = 0;
   for (var i = start; i < end; i++) {
-    var s = samp[k|0];
+    var s = 0;
+    // if ((k|0) != (k-dk)|0)
+    s = samp[k|0];
     // we low-pass filter here since we are resampling some arbitrary
     // frequency to f_smp; this is an anti-aliasing filter and is
     // implemented as an IIR butterworth filter (usually we'd use an FIR
@@ -327,7 +338,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
     ch.vRprev = volR;
     dataL[i] += ch.vL * si;
     dataR[i] += ch.vR * si;
-    Vrms += ch.vL * ch.vR * si * si;
+    Vrms += (ch.vL + ch.vR) * si * si;
     k += dk;
     if (k >= sample_end) {  // TODO: implement pingpong looping
       if (loop) {
@@ -342,7 +353,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   }
   ch.off = k;
   ch.doff = dk;
-  return Vrms;
+  return Vrms * 0.5;
 }
 
 function audio_cb(e) {
@@ -686,6 +697,8 @@ function playXM(arrayBuf) {
             samptype, prettify_note(sampnote), sampfinetune, samppan);
         console.log("           vol env", env_vol, env_vol_sustain,
             env_vol_loop_start, env_vol_loop_end, "type", env_vol_type);
+        console.log("           pan env", env_pan, env_pan_sustain,
+            env_pan_loop_start, env_pan_loop_end, "type", env_pan_type);
         idx += samplen + samphdrsiz;
       }
       inst = {
