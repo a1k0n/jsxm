@@ -144,8 +144,7 @@ function next_row() {
       } else if (v >= 0x90 && v < 0xa0) {  // fine volume slide up
         ch.vol = Math.min(64, ch.vol + (v & 0x0f));
       } else if (v >= 0xc0 && v < 0xd0) {  // set panning
-        ch.pan = 16 * (v & 0x0f);
-        console.log("channel", i, "pan", ch.pan);
+        ch.pan = (v & 0x0f) * 0x11;
       } else {
         console.log("channel", i, "volume effect", v.toString(16));
       }
