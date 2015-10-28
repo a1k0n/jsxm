@@ -102,7 +102,7 @@ function next_row() {
     // instrument trigger
     if (r[i][1] != -1) {
       var inst = instruments[r[i][1] - 1];
-      if (inst !== undefined) {
+      if (inst != undefined) {
         ch.inst = inst;
         // retrigger unless overridden below
         triggernote = true;
@@ -121,15 +121,14 @@ function next_row() {
         // assume linear frequency table (flags header & 1 == 1)
         // is this true in kamel.xm?
         var inst = ch.inst;
-        if (inst === undefined) {
-          continue;
+        if (inst != undefined) {
+          var note = r[i][0] + inst.note;
+          ch.note = note;
+          triggernote = true;
+          // if there's an instrument and a note, set the volume
+          ch.pan = inst.pan;
+          ch.vol = inst.vol;
         }
-        var note = r[i][0] + inst.note;
-        ch.note = note;
-        triggernote = true;
-        // if there's an instrument and a note, set the volume
-        ch.pan = inst.pan;
-        ch.vol = inst.vol;
       }
     }
     if (r[i][2] != -1) {  // volume column
@@ -167,7 +166,7 @@ function next_row() {
         ch.periodtarget = PeriodForNote(ch, ch.note);
       }
       triggernote = false;
-      if (ch.release) {
+      if (ch.release && inst != undefined) {
         // reset envelopes if note was released but leave offset/pitch/etc
         // alone
         ch.envtick = 0;
@@ -446,6 +445,23 @@ function eff_t0_a(ch, data) {  // volume slide
   }
 }
 
+function eff_t0_c(ch, data) {  // set volume
+  ch.vol = data & 0x3f;
+}
+
+function eff_t0_f(ch, data) {  // set tempo
+  if (data == 0) {
+    console.log("tempo 0?");
+    return;
+  } else if(data < 0x20) {
+    tempo = data;
+    console.log("tempo", tempo);
+  } else {
+    bpm = data;
+    console.log("bpm", bpm);
+  }
+}
+
 function eff_unimplemented_t0(ch, data) {
   console.log("unimplemented effect", ch.effect.toString(16), data.toString(16));
 }
@@ -463,10 +479,10 @@ var effects_t0 = [  // effect functions on tick 0
   eff_unimplemented_t0,  // 9
   eff_t0_a,
   eff_unimplemented_t0,  // b
-  eff_unimplemented_t0,  // c
+  eff_t0_c,  // c
   eff_unimplemented_t0,  // d
   eff_unimplemented_t0,  // e
-  eff_unimplemented_t0,  // f
+  eff_t0_f,  // f
 ];
 
 function eff_t1_0(ch) {  // arpeggio
@@ -584,7 +600,9 @@ function playXM(arrayBuf) {
       vL: 0, vR: 0,   // left right volume envelope followers (changes per sample)
       vLprev: 0, vRprev: 0,
       mute: 0,
-      volE: 0, panE: 0
+      volE: 0, panE: 0,
+      vibratodepth: 1,
+      vibratospeed: 1,
     })
   }
   console.log("header len " + hlen);
@@ -608,7 +626,7 @@ function playXM(arrayBuf) {
     var patsize = dv.getUint16(idx + 7, true);
     console.log("pattern %d: %d bytes, %d rows", i, patsize, patrows);
     idx += 9;
-    for (var j = 0; j < patrows; j++) {
+    for (var j = 0; patsize > 0 && j < patrows; j++) {
       row = [];
       pretty_row = [];
       for (var k = 0; k < nchan; k++) {
@@ -642,8 +660,6 @@ function playXM(arrayBuf) {
         pretty_row.push(prettify_notedata(note, inst, vol, efftype, effparam));
         row.push([note, inst, vol, efftype, effparam]);
       }
-      if (i == 12)
-        console.log(pretty_row.join("  "));
       pattern.push(row);
     }
     patterns.push(pattern);
@@ -679,6 +695,7 @@ function playXM(arrayBuf) {
       console.log("hdrsiz %d; instrument %d: '%s' %d samples, samphdrsiz %d",
           hdrsiz, i, instname, nsamp, samphdrsiz);
       idx += hdrsiz;
+      var totalsamples = 0;
       for (var j = 0; j < nsamp; j++) {
         var samplen = dv.getUint32(idx, true);
         var samploop = dv.getUint32(idx+4, true);
@@ -698,16 +715,23 @@ function playXM(arrayBuf) {
             env_vol_loop_start, env_vol_loop_end, "type", env_vol_type);
         console.log("           pan env", env_pan, env_pan_sustain,
             env_pan_loop_start, env_pan_loop_end, "type", env_pan_type);
-        idx += samplen + samphdrsiz;
+        idx += samphdrsiz;
+        totalsamples += samplen;
       }
+      idx += totalsamples;
       inst = {
         'name': instname,
         'len': samplen, 'loop': samploop,
         'looplen': samplooplen, 'note': sampnote, 'fine': sampfinetune,
         'pan': samppan, 'type': samptype, 'vol': sampvol,
         'fine': sampfinetune,
-        'sampledata': ConvertSample(new Uint8Array(arrayBuf, sampleoffset, samplen), samptype & 4),
+        'sampledata': ConvertSample(new Uint8Array(arrayBuf, sampleoffset, samplen), samptype & 16),
       };
+      if (samptype & 16) {
+        inst.len /= 2;
+        inst.loop /= 2;
+        inst.looplen /= 2;
+      }
       if (env_vol_type) {
         inst.env_vol = new Envelope(
             env_vol,
@@ -726,6 +750,7 @@ function playXM(arrayBuf) {
       }
       instruments.push(inst);
     } else {
+      idx += hdrsiz;
       instruments.push(null);
     }
   }
@@ -746,7 +771,11 @@ function playXM(arrayBuf) {
 }
 
 var xmReq = new XMLHttpRequest();
-xmReq.open("GET", "kamel.xm", true);
+var uri = location.search.substr(1);
+if (uri == "") {
+  uri = "kamel.xm";
+}
+xmReq.open("GET", uri, true);
 xmReq.responseType = "arraybuffer";
 xmReq.onload = function (xmEvent) {
   var arrayBuffer = xmReq.response;
