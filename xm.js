@@ -473,8 +473,23 @@ function eff_t0_a(ch, data) {  // volume slide
   }
 }
 
+function eff_t0_b(ch, data) {  // song jump (untested)
+  if (data < songpats.length) {
+    cur_songpos = data
+    cur_pat = songpats[cur_songpos];
+  }
+}
+
 function eff_t0_c(ch, data) {  // set volume
   ch.vol = data & 0x3f;
+}
+
+function eff_t0_d(ch, data) {  // pattern jump
+  cur_songpos++;
+  if (cur_songpos >= songpats.length)
+    cur_songpos = song_looppos;
+  cur_pat = songpats[cur_songpos];
+  cur_row = data;
 }
 
 function eff_t0_e(ch, data) {  // extended effects!
@@ -537,9 +552,9 @@ var effects_t0 = [  // effect functions on tick 0
   eff_t0_8,  // 8
   eff_t0_9,  // 9
   eff_t0_a,  // a
-  eff_unimplemented_t0,  // b
+  eff_t0_b,  // b
   eff_t0_c,  // c
-  eff_unimplemented_t0,  // d
+  eff_t0_d,  // d
   eff_t0_e,  // e
   eff_t0_f,  // f
 ];
@@ -622,11 +637,11 @@ var effects_t1 = [  // effect functions on tick 1+
   eff_nop,   // 8
   eff_nop,   // 9
   eff_t1_a,  // a
-  eff_unimplemented,  // b
+  eff_nop,   // b
   eff_nop,   // c
-  eff_unimplemented,  // d
+  eff_nop,   // d
   eff_t1_e,  // e
-  eff_unimplemented,  // f
+  eff_nop,   // f
 ];
 
 function ConvertSample(array, bits) {
