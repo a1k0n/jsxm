@@ -469,6 +469,39 @@ function eff_t0_c(ch, data) {  // set volume
   ch.vol = data & 0x3f;
 }
 
+function eff_t0_e(ch, data) {  // extended effects!
+  var eff = data >> 4;
+  data = data & 0x0f;
+  switch (eff) {
+    case 1:  // fine porta up
+      ch.period -= data;
+      break;
+    case 2:  // fine porta down
+      ch.period += data;
+      break;
+    case 8:  // panning
+      ch.pan = data * 0x11;
+      break;
+    case 0x0a:  // fine vol slide up (with memory)
+      if (data == 0 && ch.finevolup != undefined)
+        data = ch.finevolup;
+      ch.vol = Math.min(64, ch.vol + data);
+      ch.finevolup = data;
+      break;
+    case 0x0b:  // fine vol slide down
+      if (data == 0 && ch.finevoldown != undefined)
+        data = ch.finevoldown;
+      ch.vol = Math.max(0, ch.vol - data);
+      ch.finevoldown = data;
+      break;
+    case 0x0c:  // note cut handled in eff_t1_e
+      break;
+    default:
+      console.log("unimplemented extended effect E", ch.effect.toString(16));
+      break;
+  }
+}
+
 function eff_t0_f(ch, data) {  // set tempo
   if (data == 0) {
     console.log("tempo 0?");
@@ -499,7 +532,7 @@ var effects_t0 = [  // effect functions on tick 0
   eff_unimplemented_t0,  // b
   eff_t0_c,  // c
   eff_unimplemented_t0,  // d
-  eff_unimplemented_t0,  // e
+  eff_t0_e,  // e
   eff_t0_f,  // f
 ];
 
@@ -552,6 +585,16 @@ function eff_t1_a(ch) {  // volume slide
   }
 }
 
+function eff_t1_e(ch) {  // note cut
+  switch (ch.effectdata >> 4) {
+    case 0x0c:
+      if (cur_tick == (ch.effectdata & 0x0f)) {
+        ch.vol = 0;
+      }
+      break;
+  }
+}
+
 function eff_unimplemented() {}
 var effects_t1 = [  // effect functions on tick 1+
   eff_t1_0,
@@ -568,7 +611,7 @@ var effects_t1 = [  // effect functions on tick 1+
   eff_unimplemented,  // b
   eff_unimplemented,  // c
   eff_unimplemented,  // d
-  eff_unimplemented,  // e
+  eff_t1_e,  // e
   eff_unimplemented,  // f
 ];
 
