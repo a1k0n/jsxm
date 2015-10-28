@@ -455,6 +455,14 @@ function eff_t0_4(ch, data) {  // vibrato
   eff_t1_4(ch, data);
 }
 
+function eff_t0_8(ch, data) {  // set panning
+  ch.pan = data;
+}
+
+function eff_t0_9(ch, data) {  // sample offset
+  ch.off = data * 256;
+}
+
 function eff_t0_a(ch, data) {  // volume slide
   if (data) {
     if (data & 0x0f) {
@@ -523,12 +531,12 @@ var effects_t0 = [  // effect functions on tick 0
   eff_t0_2,
   eff_t0_3,
   eff_t0_4,  // 4
-  eff_unimplemented_t0,  // 5
+  eff_t0_a,  // 5, same as A on first tick
   eff_t0_a,  // 6, same as A on first tick
   eff_unimplemented_t0,  // 7
-  eff_unimplemented_t0,  // 8
-  eff_unimplemented_t0,  // 9
-  eff_t0_a,
+  eff_t0_8,  // 8
+  eff_t0_9,  // 9
+  eff_t0_a,  // a
   eff_unimplemented_t0,  // b
   eff_t0_c,  // c
   eff_unimplemented_t0,  // d
@@ -574,6 +582,11 @@ function eff_t1_4(ch) {  // vibrato
   ch.vibratopos &= 63;
 }
 
+function eff_t1_5(ch) {  // portamento + volume slide
+  eff_t1_a(ch);
+  eff_t1_3(ch);
+}
+
 function eff_t1_6(ch) {  // vibrato + volume slide
   eff_t1_a(ch);
   eff_t1_4(ch);
@@ -595,6 +608,7 @@ function eff_t1_e(ch) {  // note cut
   }
 }
 
+function eff_nop() {}
 function eff_unimplemented() {}
 var effects_t1 = [  // effect functions on tick 1+
   eff_t1_0,
@@ -602,14 +616,14 @@ var effects_t1 = [  // effect functions on tick 1+
   eff_t1_2,
   eff_t1_3,
   eff_t1_4,
-  eff_unimplemented,  // 5
-  eff_t1_6,
+  eff_t1_5,  // 5
+  eff_t1_6,  // 6
   eff_unimplemented,  // 7
-  eff_unimplemented,  // 8
-  eff_unimplemented,  // 9
+  eff_nop,   // 8
+  eff_nop,   // 9
   eff_t1_a,  // a
   eff_unimplemented,  // b
-  eff_unimplemented,  // c
+  eff_nop,   // c
   eff_unimplemented,  // d
   eff_t1_e,  // e
   eff_unimplemented,  // f
