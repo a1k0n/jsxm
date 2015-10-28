@@ -6,7 +6,6 @@ audioContext = window.AudioContext || window.webkitAudioContext;
 function prettify_note(note) {
   if (note < 0) return "---";
   if (note == 96) return "^^^";
-  note += 11;
   return _note_names[note%12] + ~~(note/12);
 }
 
@@ -257,7 +256,7 @@ function next_tick() {
     var ch = channelinfo[j];
     var inst = ch.inst;
     ch.periodoffset = 0;
-    if (ch.effectfn) {
+    if (cur_tick != 0 && ch.effectfn) {
       ch.effectfn(ch);
     }
     if (inst === undefined) continue;
@@ -276,8 +275,10 @@ function MixSilenceIntoBuf(ch, start, end, dataL, dataR) {
     return;
   }
   for (var i = start; i < end; i++) {
-    if (Math.abs(s) < 1.526e-5)  // == 1/65536.0
+    if (Math.abs(s) < 1.526e-5) {  // == 1/65536.0
+      s = 0;
       break;
+    }
     dataL[i] += s * ch.vL;
     dataR[i] += s * ch.vR;
     s *= popfilter_alpha;
@@ -580,7 +581,7 @@ function ConvertSample(array, bits) {
       acc += array[k];
       var b = acc&255;
       if (b & 128) b = b-256;
-      samp[k] = (b - 128) / 128.0;
+      samp[k] = b / 128.0;
     }
     return samp;
   } else {
@@ -724,13 +725,13 @@ function playXM(arrayBuf) {
         var sampfinetune = dv.getInt8(idx+13);
         var samptype = dv.getUint8(idx+14);
         var samppan = dv.getUint8(idx+15);
-        var sampnote = dv.getUint8(idx+16);
+        var sampnote = dv.getInt8(idx+16);
         var sampname = getstring(dv, idx+18, 22);
         var sampleoffset = idx + samphdrsiz;
         console.log("sample %d: len %d name '%s' loop %d/%d vol %d",
             j, samplen, sampname, samploop, samplooplen, sampvol);
-        console.log("           type %d note %s finetune %d pan %d",
-            samptype, prettify_note(sampnote), sampfinetune, samppan);
+        console.log("           type %d note %s(%d) finetune %d pan %d",
+            samptype, prettify_note(sampnote + 12*4), sampnote, sampfinetune, samppan);
         console.log("           vol env", env_vol, env_vol_sustain,
             env_vol_loop_start, env_vol_loop_end, "type", env_vol_type);
         console.log("           pan env", env_pan, env_pan_sustain,
