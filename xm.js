@@ -51,9 +51,11 @@ var tempo = 4;
 // Return 2-pole Butterworth lowpass filter coefficients for
 // center frequncy f_c (relative to sampling frequency)
 function FilterCoeffs(f_c) {
-//  if (f_c > 0.5) {  // we can't lowpass above the nyquist frequency...
-//    return [1, 0, 0];
-//  }
+  //  if (f_c > 0.5) {  // we can't lowpass above the nyquist frequency...
+  //    return [1, 0, 0];
+  //  }
+  //  what happens instead is the filter wraps around to an alias frequency,
+  //  and that also works OK, though it isn't strictly right... FIXME
   var wct = Math.sqrt(2) * Math.PI * f_c;
   var e = Math.exp(-wct);
   var c = e * Math.cos(wct);
@@ -73,11 +75,6 @@ function UpdateChannelPeriod(ch, period) {
 
 function PeriodForNote(ch, note) {
   return 1920 - note*16 - ch.inst.fine / 8.0;
-}
-
-function UpdateChannelNote(ch, note) {
-  ch.period = PeriodForNote(ch, note);
-  UpdateChannelPeriod(ch, ch.period);
 }
 
 var cur_songpos = -1, cur_pat = -1, cur_row = 64, cur_ticksamp = 0;
@@ -183,7 +180,7 @@ function next_row() {
       ch.vibratopos = 0;
       ch.env_vol = new EnvelopeFollower(inst.env_vol);
       ch.env_pan = new EnvelopeFollower(inst.env_pan);
-      UpdateChannelNote(ch, note);
+      ch.period = PeriodForNote(ch, note);
     }
   }
   var debug = document.getElementById("debug");
@@ -259,12 +256,14 @@ function next_tick() {
   for (var j = 0; j < nchan; j++) {
     var ch = channelinfo[j];
     var inst = ch.inst;
+    ch.periodoffset = 0;
     if (ch.effectfn) {
       ch.effectfn(ch);
     }
     if (inst === undefined) continue;
     ch.volE = ch.env_vol.Tick(ch.release, 64);
     ch.panE = ch.env_pan.Tick(ch.release, 32);
+    UpdateChannelPeriod(ch, ch.period + ch.periodoffset);
   }
 }
 
@@ -272,6 +271,10 @@ function next_tick() {
 // already to avoid clicks and pops when samples end.
 function MixSilenceIntoBuf(ch, start, end, dataL, dataR) {
   var s = ch.filterstate[1];
+  if (isNaN(s)) {
+    console.log("NaN filterstate?", ch.filterstate, ch.filter);
+    return;
+  }
   for (var i = start; i < end; i++) {
     if (Math.abs(s) < 1.526e-5)  // == 1/65536.0
       break;
@@ -281,6 +284,10 @@ function MixSilenceIntoBuf(ch, start, end, dataL, dataR) {
   }
   ch.filterstate[1] = s;
   ch.filterstate[2] = s;
+  if (isNaN(s)) {
+    console.log("NaN filterstate after adding silence?", ch.filterstate, ch.filter, i);
+    return;
+  }
   return 0;
 }
 
@@ -291,7 +298,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   var looplen = 0;
 
   // nothing on this channel, just filter the last dc offset back down to zero
-  if (inst === undefined || ch.mute) {
+  if (inst == undefined || ch.mute) {
     return MixSilenceIntoBuf(ch, start, end, dataL, dataR);
   }
 
@@ -312,13 +319,31 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   if (volR < 0) volR = 0;
   if (volR == 0 && volL == 0)
     return;
+  if (isNaN(volR) || isNaN(volL)) {
+    console.log("NaN volume!?", volL, volR, colE, panE, ch.vol);
+    return;
+  }
   var k = ch.off;
   var dk = ch.doff;
   var Vrms = 0;
   for (var i = start; i < end; i++) {
-    var s = 0;
-    // if ((k|0) != (k-dk)|0)
-    s = samp[k|0];
+    if (k >= sample_end) {  // TODO: implement pingpong looping
+      if (loop) {
+        k %= looplen;
+      } else {
+        // kill sample
+        ch.inst = undefined;
+        // fill rest of buf with filtered dc offset using loop above
+        return Vrms + MixSilenceIntoBuf(ch, i+1, end, dataL, dataR);
+      }
+    }
+    var s = samp[k|0];
+    // TODO: robustify, then remove these NaN checks from the inner loops
+    if (isNaN(s)) {
+      console.log("NaN sample idx", samp.length, k|0);
+      tempo = 10000;
+      break;
+    }
     // we low-pass filter here since we are resampling some arbitrary
     // frequency to f_smp; this is an anti-aliasing filter and is
     // implemented as an IIR butterworth filter (usually we'd use an FIR
@@ -326,6 +351,10 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
     // sounds fine)
     var si = ch.filter[0] * (s + ch.filterstate[0]) +
       ch.filter[1]*ch.filterstate[1] + ch.filter[2]*ch.filterstate[2];
+    if (isNaN(si)) {
+      console.log("NaN after filter sample idx", samp, k|0, ch.filter, ch.filterstate, s);
+      break;
+    }
     ch.filterstate[2] = ch.filterstate[1];
     ch.filterstate[1] = si; ch.filterstate[0] = s;
     // we also low-pass filter volume changes with a simple one-zero,
@@ -338,16 +367,6 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
     dataR[i] += ch.vR * si;
     Vrms += (ch.vL + ch.vR) * si * si;
     k += dk;
-    if (k >= sample_end) {  // TODO: implement pingpong looping
-      if (loop) {
-        k -= looplen;
-      } else {
-        // kill sample
-        ch.inst = undefined;
-        // fill rest of buf with filtered dc offset using loop above
-        return Vrms + MixSilenceIntoBuf(ch, i+1, end, dataL, dataR);
-      }
-    }
   }
   ch.off = k;
   ch.doff = dk;
@@ -455,10 +474,8 @@ function eff_t0_f(ch, data) {  // set tempo
     return;
   } else if(data < 0x20) {
     tempo = data;
-    console.log("tempo", tempo);
   } else {
     bpm = data;
-    console.log("bpm", bpm);
   }
 }
 
@@ -471,9 +488,9 @@ var effects_t0 = [  // effect functions on tick 0
   eff_t0_1,
   eff_t0_2,
   eff_t0_3,
-  eff_t0_4,
+  eff_t0_4,  // 4
   eff_unimplemented_t0,  // 5
-  eff_unimplemented_t0,  // 6
+  eff_t0_a,  // 6, same as A on first tick
   eff_unimplemented_t0,  // 7
   eff_unimplemented_t0,  // 8
   eff_unimplemented_t0,  // 9
@@ -489,21 +506,21 @@ function eff_t1_0(ch) {  // arpeggio
   if (ch.effectdata != 0) {
     var arpeggio = [0, ch.effectdata>>4, ch.effectdata&15];
     var note = ch.note + arpeggio[cur_tick % 3];
-    UpdateChannelNote(ch, note);
+    ch.period = PeriodForNote(ch, note);
   }
 }
 
 function eff_t1_1(ch) {  // pitch slide up
   if (ch.slideupspeed !== undefined) {
+    // is this limited? it appears not
     ch.period -= ch.slideupspeed;
-    UpdateChannelPeriod(ch, ch.period);
   }
 }
 
 function eff_t1_2(ch) {  // pitch slide down
   if (ch.slidedownspeed !== undefined) {
-    ch.period += ch.slidedownspeed;
-    UpdateChannelPeriod(ch, ch.period);
+    // 1728 is the period for C-1
+    ch.period = Math.min(1728, ch.period + ch.slidedownspeed);
   }
 }
 
@@ -514,15 +531,18 @@ function eff_t1_3(ch) {  // portamento
     } else {
       ch.period = Math.min(ch.periodtarget, ch.period + ch.portaspeed);
     }
-    UpdateChannelPeriod(ch, ch.period);
   }
 }
 
 function eff_t1_4(ch) {  // vibrato
-  ch.period += Math.sin(ch.vibratopos * Math.PI / 32) * ch.vibratodepth;
-  UpdateChannelPeriod(ch, ch.period);
+  ch.periodoffset = Math.sin(ch.vibratopos * Math.PI / 32) * ch.vibratodepth;
   ch.vibratopos += ch.vibratospeed;
   ch.vibratopos &= 63;
+}
+
+function eff_t1_6(ch) {  // vibrato + volume slide
+  eff_t1_a(ch);
+  eff_t1_4(ch);
 }
 
 function eff_t1_a(ch) {  // volume slide
@@ -539,7 +559,7 @@ var effects_t1 = [  // effect functions on tick 1+
   eff_t1_3,
   eff_t1_4,
   eff_unimplemented,  // 5
-  eff_unimplemented,  // 6
+  eff_t1_6,
   eff_unimplemented,  // 7
   eff_unimplemented,  // 8
   eff_unimplemented,  // 9
