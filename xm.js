@@ -80,7 +80,7 @@ var cur_songpos = -1, cur_pat = -1, cur_row = 64, cur_ticksamp = 0;
 var cur_tick = 6;
 var patdisplay = [];
 function next_row() {
-  if (cur_row >= 64) {
+  if (cur_pat == -1 || cur_row >= patterns[cur_pat].length) {
     cur_row = 0;
     cur_songpos++;
     if (cur_songpos >= songpats.length)
