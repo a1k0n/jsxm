@@ -182,15 +182,10 @@ function next_row() {
       ch.period = PeriodForNote(ch, note);
     }
   }
-  var debug = document.getElementById("debug");
-  debug.innerHTML = 'pat ' + cur_pat + ' row ' + (cur_row-1);
-
-  var pat = document.getElementById("pattern");
   patdisplay.push(pretty_row.join("  "));
   if (patdisplay.length > 16) {
     patdisplay.shift();
   }
-  pat.innerHTML = patdisplay.join("\n");
 }
 
 function Envelope(points, type, sustain, loopstart, loopend) {
@@ -421,6 +416,11 @@ function audio_cb(e) {
     var y = -Math.log(rms)*10;
     ctx.fillRect(j*16, y, 15, 64-y);
   }
+
+  var debug = document.getElementById("debug");
+  debug.innerHTML = 'pat ' + cur_pat + ' row ' + (cur_row-1);
+  var pat = document.getElementById("pattern");
+  pat.innerHTML = patdisplay.join("\n");
 }
 
 function eff_t0_0(ch, data) {  // arpeggio
@@ -504,7 +504,7 @@ var effects_t0 = [  // effect functions on tick 0
 ];
 
 function eff_t1_0(ch) {  // arpeggio
-  if (ch.effectdata != 0) {
+  if (ch.effectdata != 0 && ch.inst != undefined) {
     var arpeggio = [0, ch.effectdata>>4, ch.effectdata&15];
     var note = ch.note + arpeggio[cur_tick % 3];
     ch.period = PeriodForNote(ch, note);
@@ -691,25 +691,25 @@ function playXM(arrayBuf) {
     var hdrsiz = dv.getUint32(idx, true);
     var instname = getstring(dv, idx+0x4, 22);
     var nsamp = dv.getUint16(idx+0x1b, true);
-    var env_nvol = dv.getUint8(idx+225);
-    var env_vol_type = dv.getUint8(idx+233);
-    var env_vol_sustain = dv.getUint8(idx+227);
-    var env_vol_loop_start = dv.getUint8(idx+228);
-    var env_vol_loop_end = dv.getUint8(idx+229);
-    var env_npan = dv.getUint8(idx+226);
-    var env_pan_type = dv.getUint8(idx+234);
-    var env_pan_sustain = dv.getUint8(idx+230);
-    var env_pan_loop_start = dv.getUint8(idx+231);
-    var env_pan_loop_end = dv.getUint8(idx+232);
-    env_vol = [];
-    for (var j = 0; j < env_nvol*2; j++) {
-      env_vol.push(dv.getUint16(idx+129+j*2, true));
-    }
-    env_pan = [];
-    for (var j = 0; j < env_npan*2; j++) {
-      env_pan.push(dv.getUint16(idx+177+j*2, true));
-    }
     if (nsamp > 0) {
+      var env_nvol = dv.getUint8(idx+225);
+      var env_vol_type = dv.getUint8(idx+233);
+      var env_vol_sustain = dv.getUint8(idx+227);
+      var env_vol_loop_start = dv.getUint8(idx+228);
+      var env_vol_loop_end = dv.getUint8(idx+229);
+      var env_npan = dv.getUint8(idx+226);
+      var env_pan_type = dv.getUint8(idx+234);
+      var env_pan_sustain = dv.getUint8(idx+230);
+      var env_pan_loop_start = dv.getUint8(idx+231);
+      var env_pan_loop_end = dv.getUint8(idx+232);
+      var env_vol = [];
+      for (var j = 0; j < env_nvol*2; j++) {
+        env_vol.push(dv.getUint16(idx+129+j*2, true));
+      }
+      var env_pan = [];
+      for (var j = 0; j < env_npan*2; j++) {
+        env_pan.push(dv.getUint16(idx+177+j*2, true));
+      }
       // FIXME: ignoring keymaps for now and assuming 1 sample / instrument
       // var keymap = getarray(dv, idx+0x21);
       var samphdrsiz = dv.getUint32(idx+0x1d, true);
@@ -772,6 +772,7 @@ function playXM(arrayBuf) {
       instruments.push(inst);
     } else {
       idx += hdrsiz;
+      console.log("empty instrument", i, hdrsiz, idx);
       instruments.push(null);
     }
   }
