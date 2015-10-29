@@ -221,7 +221,7 @@ function EnvelopeFollower(env) {
 
 EnvelopeFollower.prototype.Tick = function(release) {
   var value = this.env.Get(this.tick);
-  if (this.env.type & 1) {  // sustain?
+  if (this.env.type & 2) {  // sustain?
     // if we're sustaining a note, stop advancing the tick counter
     if (!release &&
         this.tick >= this.env.points[this.env.sustain*2]) {
@@ -229,7 +229,7 @@ EnvelopeFollower.prototype.Tick = function(release) {
     }
   }
   this.tick++;
-  if (this.env.type & 2) {  // envelope loop?
+  if (this.env.type & 4) {  // envelope loop?
     if (!release &&
         this.tick > this.env.loopend) {
       this.tick -= this.env.loopend - this.env.loopstart;
@@ -948,7 +948,7 @@ function playXM(arrayBuf) {
             env_vol_loop_end);
       } else {
         // create a default envelope w/ fadeout
-        inst.env_vol = new Envelope([0, 64, fadeout_ticks, 0], 1, 0, 0, 0);
+        inst.env_vol = new Envelope([0, 64, fadeout_ticks, 0], 2, 0, 0, 0);
       }
       if (env_pan_type) {
         inst.env_pan = new Envelope(
