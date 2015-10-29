@@ -34,7 +34,7 @@ function prettify_notedata(note, inst, vol, efftype, effparam) {
 }
 
 function getstring(dv, offset, len) {
-  var str = []
+  var str = [];
   for (var i = offset; i < offset+len; i++) {
     var c = dv.getUint8(i);
     if (c == 0) break;
@@ -669,6 +669,34 @@ function ConvertSample(array, bits) {
   }
 }
 
+function UnrollSampleLoop(inst) {
+  var nloops = ((2048 + inst.looplen - 1) / inst.looplen) | 0;
+  var pingpong = inst.type & 2;
+  if (pingpong) {
+    // make sure we have an even number of loops if we are pingponging
+    nloops = (nloops + 1) & (~1);
+  }
+  var samplesiz = inst.loop + nloops * inst.looplen;
+  var samp = new Float32Array(samplesiz);
+  for (var i = 0; i < inst.loop; i++) {
+    samp[i] = inst.sampledata[i];
+  }
+  for (var j = 0; j < nloops; j++) {
+    if (j&1 && pingpong) {
+      for (var k = inst.looplen - 1; k >= 0; k--) {
+        samp[i++] = inst.sampledata[inst.loop + k];
+      }
+    } else {
+      for (var k = 0; k < inst.looplen; k++) {
+        samp[i++] = inst.sampledata[inst.loop + k];
+      }
+    }
+  }
+  inst.sampledata = samp;
+  inst.looplen = nloops * inst.looplen;
+  inst.type &= ~2;
+}
+
 function playXM(arrayBuf) {
   var dv = new DataView(arrayBuf);
   window.dv = dv;
@@ -713,7 +741,7 @@ function playXM(arrayBuf) {
   var idx = hlen;
   patterns = [];
   for (var i = 0; i < npat; i++) {
-    var pattern = []
+    var pattern = [];
     var patheaderlen = dv.getUint32(idx, true);
     var patrows = dv.getUint16(idx + 5, true);
     var patsize = dv.getUint16(idx + 7, true);
@@ -825,6 +853,12 @@ function playXM(arrayBuf) {
         inst.loop /= 2;
         inst.looplen /= 2;
       }
+
+      // unroll short loops and any pingpong loops
+      if ((inst.type & 1) && (inst.looplen < 2048 || (inst.type & 2))) {
+        UnrollSampleLoop(inst);
+      }
+
       if (env_vol_type) {
         inst.env_vol = new Envelope(
             env_vol,
