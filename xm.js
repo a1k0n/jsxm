@@ -177,8 +177,8 @@ function next_row() {
       ch.release = 0;
       ch.envtick = 0;
       ch.vibratopos = 0;
-      ch.env_vol = new EnvelopeFollower(inst.env_vol, inst.fadeout);
-      ch.env_pan = new EnvelopeFollower(inst.env_pan, 0);
+      ch.env_vol = new EnvelopeFollower(inst.env_vol);
+      ch.env_pan = new EnvelopeFollower(inst.env_pan);
       ch.period = PeriodForNote(ch, note);
     }
   }
@@ -214,23 +214,12 @@ Envelope.prototype.Get = function(ticks) {
   return y0;
 }
 
-function EnvelopeFollower(env, fadeout) {
+function EnvelopeFollower(env) {
   this.env = env;
-  this.fadeout = 64.0 * fadeout / 65536.0;
   this.tick = 0;
 }
 
-EnvelopeFollower.prototype.Tick = function(release, defaultval) {
-  // no envelope, just emit full volume
-  if (this.env === undefined) {
-    if (release) {
-      var value = Math.min(0, defaultval - this.tick * this.fadeout);
-      this.tick++;
-      return value;
-    } else {
-      return defaultval;
-    }
-  }
+EnvelopeFollower.prototype.Tick = function(release) {
   var value = this.env.Get(this.tick);
   if (this.env.type & 1) {  // sustain?
     // if we're sustaining a note, stop advancing the tick counter
@@ -262,13 +251,9 @@ function next_tick() {
     if (cur_tick != 0 && ch.effectfn) {
       ch.effectfn(ch);
     }
-    if (inst == undefined) continue;
-    if (ch.env_vol == undefined) {
-      console.log("channel", j, "env_vol defined but not inst?", ch);
-      continue;
-    }
-    ch.volE = ch.env_vol.Tick(ch.release, 64);
-    ch.panE = ch.env_pan.Tick(ch.release, 32);
+    if (inst === undefined) continue;
+    ch.volE = ch.env_vol.Tick(ch.release);
+    ch.panE = ch.env_pan.Tick(ch.release);
     UpdateChannelPeriod(ch, ch.period + ch.periodoffset);
   }
 }
@@ -961,6 +946,9 @@ function playXM(arrayBuf) {
             env_vol_sustain,
             env_vol_loop_start,
             env_vol_loop_end);
+      } else {
+        // create a default envelope w/ fadeout
+        inst.env_vol = new Envelope([0, 64, fadeout_ticks, 0], 1, 0, 0, 0);
       }
       if (env_pan_type) {
         inst.env_pan = new Envelope(
@@ -969,6 +957,9 @@ function playXM(arrayBuf) {
             env_pan_sustain,
             env_pan_loop_start,
             env_pan_loop_end);
+      } else {
+        // create a default empty envelope
+        inst.env_pan = new Envelope([0, 32], 0, 0, 0, 0);
       }
       instruments.push(inst);
     } else {
