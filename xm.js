@@ -21,16 +21,16 @@ function prettify_volume(num) {
 }
 
 function prettify_effect(t, p) {
-  t = t.toString(16);
+  if (t >= 10) t = String.fromCharCode(55 + t);
   if (p < 16) p = '0' + p.toString(16);
   else p = p.toString(16);
   return t + p
 }
 
-function prettify_notedata(note, inst, vol, efftype, effparam) {
-  return (prettify_note(note) + " " + prettify_number(inst) + " "
-    + prettify_volume(vol) + " "
-    + prettify_effect(efftype, effparam));
+function prettify_notedata(data) {
+  return (prettify_note(data[0]) + " " + prettify_number(data[1]) + " "
+    + prettify_volume(data[2]) + " "
+    + prettify_effect(data[3], data[4]));
 }
 
 function getstring(dv, offset, len) {
@@ -68,6 +68,10 @@ popfilter_alpha = 0.9837;
 
 function UpdateChannelPeriod(ch, period) {
   var freq = 8363 * Math.pow(2, (1152.0 - period) / 192.0);
+  if (isNaN(freq)) {
+    console.log("invalid period!", period);
+    return;
+  }
   ch.doff = freq / f_smp;
   ch.filter = FilterCoeffs(ch.doff / 2);
 }
@@ -94,7 +98,8 @@ function next_row() {
   for (var i = 0; i < r.length; i++) {
     var ch = channelinfo[i];
     ch.update = false;
-    pretty_row.push(prettify_notedata(r[i][0], r[i][1], r[i][2], r[i][3], r[i][4]));
+    pretty_row.push(prettify_notedata(r[i]));
+    var triggernote = false;
     // instrument trigger
     if (r[i][1] != -1) {
       var inst = instruments[r[i][1] - 1];
@@ -107,12 +112,11 @@ function next_row() {
         // console.log("invalid inst", r[i][1], instruments.length);
       }
     }
-    var triggernote = false;
     // note trigger
     if (r[i][0] != -1) {
       if (r[i][0] == 96) {
-        // release note, FIXME once envelopes are implemented
         ch.release = 1;
+        triggernote = false;
       } else {
         // assume linear frequency table (flags header & 1 == 1)
         // is this true in kamel.xm?
@@ -128,7 +132,6 @@ function next_row() {
       }
     }
     if (r[i][2] != -1) {  // volume column
-      // FIXME: panning
       var v = r[i][2];
       if (v < 0x10) {
         console.log("channel", i, "invalid volume", v.toString(16));
@@ -162,13 +165,19 @@ function next_row() {
         ch.periodtarget = PeriodForNote(ch, ch.note);
       }
       triggernote = false;
-      if (ch.release && inst != undefined) {
-        // reset envelopes if note was released but leave offset/pitch/etc
-        // alone
-        ch.envtick = 0;
-        ch.release = 0;
-        ch.env_vol = new EnvelopeFollower(inst.env_vol, inst.fadeout);
-        ch.env_pan = new EnvelopeFollower(inst.env_pan, 0);
+      if (inst != undefined) {
+        if (ch.env_vol == undefined) {
+          // note wasn't already playing; we basically have to ignore the
+          // portamento and just trigger
+          triggernote = true;
+        } else if (ch.release) {
+          // reset envelopes if note was released but leave offset/pitch/etc
+          // alone
+          ch.envtick = 0;
+          ch.release = 0;
+          ch.env_vol = new EnvelopeFollower(inst.env_vol, inst.fadeout);
+          ch.env_pan = new EnvelopeFollower(inst.env_pan, 0);
+        }
       }
     }
 
@@ -192,8 +201,8 @@ function Envelope(points, type, sustain, loopstart, loopend) {
   this.points = points;
   this.type = type;
   this.sustain = sustain;
-  this.loopstart = loopstart;
-  this.loopend = loopend;
+  this.loopstart = points[loopstart*2];
+  this.loopend = points[loopend*2];
 }
 
 Envelope.prototype.Get = function(ticks) {
@@ -231,7 +240,7 @@ EnvelopeFollower.prototype.Tick = function(release) {
   this.tick++;
   if (this.env.type & 4) {  // envelope loop?
     if (!release &&
-        this.tick > this.env.loopend) {
+        this.tick >= this.env.loopend) {
       this.tick -= this.env.loopend - this.env.loopstart;
     }
   }
@@ -251,7 +260,16 @@ function next_tick() {
     if (cur_tick != 0 && ch.effectfn) {
       ch.effectfn(ch);
     }
-    if (inst === undefined) continue;
+    if (isNaN(ch.period)) {
+      console.log(prettify_notedata(patterns[cur_pat][cur_row-1][j]),
+          "set channel", j, "period to NaN");
+    }
+    if (inst == undefined) continue;
+    if (ch.env_vol == undefined) {
+      console.log(prettify_notedata(patterns[cur_pat][cur_row-1][j]),
+          "set channel", j, "env_vol to undefined, but note is playing");
+      continue;
+    }
     ch.volE = ch.env_vol.Tick(ch.release);
     ch.panE = ch.env_pan.Tick(ch.release);
     UpdateChannelPeriod(ch, ch.period + ch.periodoffset);
@@ -333,7 +351,12 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
 
   // we can mix up to this many bytes before running into a sample end/loop
   var i = start;
+  var failsafe = 100;
   while (i < end) {
+    if (failsafe-- == 0) {
+      console.log("failsafe in mixing loop!", k, sample_end, loopstart, looplen, dk);
+      break;
+    }
     if (k >= sample_end) {  // TODO: implement pingpong looping
       if (loop) {
         k = loopstart + (k - loopstart) % looplen;
@@ -344,11 +367,11 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
         return Vrms + MixSilenceIntoBuf(ch, i, end, dataL, dataR);
       }
     }
-    var next_event = Math.min(end, i + (sample_end - k) / dk);
+    var next_event = Math.max(1, Math.min(end, i + (sample_end - k) / dk));
     // this is the inner loop of the player
 
     // unrolled 8x
-    for (; i + 8 < next_event; i+=8) {
+    for (; i + 7 < next_event; i+=8) {
       var s = samp[k|0];
       var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
       fs2 = fs1; fs1 = y; fs0 = s;
@@ -433,7 +456,6 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
     }
   }
   ch.off = k;
-  ch.doff = dk;
   ch.filterstate[0] = fs0;
   ch.filterstate[1] = fs1;
   ch.filterstate[2] = fs2;
@@ -662,6 +684,10 @@ function eff_t1_3(ch) {  // portamento
 
 function eff_t1_4(ch) {  // vibrato
   ch.periodoffset = Math.sin(ch.vibratopos * Math.PI / 32) * ch.vibratodepth;
+  if (isNaN(ch.periodoffset)) {
+    console.log("vibrato periodoffset NaN?", ch.vibratopos, ch.vibratodepth);
+    ch.periodoffset = 0;
+  }
   ch.vibratopos += ch.vibratospeed;
   ch.vibratopos &= 63;
 }
@@ -789,6 +815,7 @@ function playXM(arrayBuf) {
       filterstate: new Float32Array(3),
       vol: 0,
       pan: 128,
+      period: 1920 - 48*16,
       vL: 0, vR: 0,   // left right volume envelope followers (changes per sample)
       vLprev: 0, vRprev: 0,
       mute: 0,
@@ -849,8 +876,9 @@ function playXM(arrayBuf) {
           efftype = dv.getUint8(idx); idx++;
           effparam = dv.getUint8(idx); idx++;
         }
-        pretty_row.push(prettify_notedata(note, inst, vol, efftype, effparam));
-        row.push([note, inst, vol, efftype, effparam]);
+        var notedata = [note, inst, vol, efftype, effparam];
+        pretty_row.push(prettify_notedata(notedata));
+        row.push(notedata);
       }
       pattern.push(row);
     }
