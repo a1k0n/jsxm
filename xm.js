@@ -167,8 +167,8 @@ function next_row() {
         // alone
         ch.envtick = 0;
         ch.release = 0;
-        ch.env_vol = new EnvelopeFollower(inst.env_vol);
-        ch.env_pan = new EnvelopeFollower(inst.env_pan);
+        ch.env_vol = new EnvelopeFollower(inst.env_vol, inst.fadeout);
+        ch.env_pan = new EnvelopeFollower(inst.env_pan, 0);
       }
     }
 
@@ -177,8 +177,8 @@ function next_row() {
       ch.release = 0;
       ch.envtick = 0;
       ch.vibratopos = 0;
-      ch.env_vol = new EnvelopeFollower(inst.env_vol);
-      ch.env_pan = new EnvelopeFollower(inst.env_pan);
+      ch.env_vol = new EnvelopeFollower(inst.env_vol, inst.fadeout);
+      ch.env_pan = new EnvelopeFollower(inst.env_pan, 0);
       ch.period = PeriodForNote(ch, note);
     }
   }
@@ -214,14 +214,22 @@ Envelope.prototype.Get = function(ticks) {
   return y0;
 }
 
-function EnvelopeFollower(env) {
+function EnvelopeFollower(env, fadeout) {
   this.env = env;
+  this.fadeout = 64.0 * fadeout / 65536.0;
   this.tick = 0;
 }
 
 EnvelopeFollower.prototype.Tick = function(release, defaultval) {
+  // no envelope, just emit full volume
   if (this.env === undefined) {
-    return defaultval;
+    if (release) {
+      var value = Math.min(0, defaultval - this.tick * this.fadeout);
+      this.tick++;
+      return value;
+    } else {
+      return defaultval;
+    }
   }
   var value = this.env.Get(this.tick);
   if (this.env.type & 1) {  // sustain?
@@ -409,7 +417,7 @@ function audio_cb(e) {
   var canvas = document.getElementById("vu");
   var ctx = canvas.getContext("2d");
   ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, 300, 64);
+  ctx.fillRect(0, 0, 16 * nchan, 64);
   ctx.fillStyle = '#0f0';
   for (var j = 0; j < nchan; j++) {
     var rms = VU[j] / e.outputBuffer.length;
@@ -669,6 +677,8 @@ function ConvertSample(array, bits) {
   }
 }
 
+// optimization: unroll short sample loops so we can run our inner mixing loop
+// uninterrupted for as long as possible; this also handles pingpong loops.
 function UnrollSampleLoop(inst) {
   var nloops = ((2048 + inst.looplen - 1) / inst.looplen) | 0;
   var pingpong = inst.type & 2;
@@ -711,6 +721,7 @@ function playXM(arrayBuf) {
   var flags = dv.getUint16(0x4a, true);
   tempo = dv.getUint16(0x4c, true);
   bpm = dv.getUint16(0x4e, true);
+  document.getElementById('vu').width = 16 * nchan;
   for (var i = 0; i < nchan; i++) {
     channelinfo.push({
       filterstate: new Float32Array(3),
@@ -802,6 +813,7 @@ function playXM(arrayBuf) {
       var env_pan_sustain = dv.getUint8(idx+230);
       var env_pan_loop_start = dv.getUint8(idx+231);
       var env_pan_loop_end = dv.getUint8(idx+232);
+      var vol_fadeout = dv.getUint16(idx+239);
       var env_vol = [];
       for (var j = 0; j < env_nvol*2; j++) {
         env_vol.push(dv.getUint16(idx+129+j*2, true));
@@ -833,7 +845,8 @@ function playXM(arrayBuf) {
         console.log("           type %d note %s(%d) finetune %d pan %d",
             samptype, prettify_note(sampnote + 12*4), sampnote, sampfinetune, samppan);
         console.log("           vol env", env_vol, env_vol_sustain,
-            env_vol_loop_start, env_vol_loop_end, "type", env_vol_type);
+            env_vol_loop_start, env_vol_loop_end, "type", env_vol_type,
+            "fadeout", vol_fadeout);
         console.log("           pan env", env_pan, env_pan_sustain,
             env_pan_loop_start, env_pan_loop_end, "type", env_pan_type);
         idx += samphdrsiz;
@@ -846,6 +859,7 @@ function playXM(arrayBuf) {
         'looplen': samplooplen, 'note': sampnote, 'fine': sampfinetune,
         'pan': samppan, 'type': samptype, 'vol': sampvol,
         'fine': sampfinetune,
+        'fadeout': vol_fadeout,
         'sampledata': ConvertSample(new Uint8Array(arrayBuf, sampleoffset, samplen), samptype & 16),
       };
       if (samptype & 16) {
@@ -860,6 +874,11 @@ function playXM(arrayBuf) {
       }
 
       if (env_vol_type) {
+        // insert an automatic fadeout to 0 at the end of the envelope
+        var env_end_tick = env_vol[env_vol.length-2];
+        var fadeout_ticks = 65536.0 / inst.fadeout;
+        env_vol.push(env_end_tick + fadeout_ticks);
+        env_vol.push(0);
         inst.env_vol = new Envelope(
             env_vol,
             env_vol_type,
