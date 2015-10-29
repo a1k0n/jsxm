@@ -262,7 +262,11 @@ function next_tick() {
     if (cur_tick != 0 && ch.effectfn) {
       ch.effectfn(ch);
     }
-    if (inst === undefined) continue;
+    if (inst == undefined) continue;
+    if (ch.env_vol == undefined) {
+      console.log("channel", j, "env_vol defined but not inst?", ch);
+      continue;
+    }
     ch.volE = ch.env_vol.Tick(ch.release, 64);
     ch.panE = ch.env_pan.Tick(ch.release, 32);
     UpdateChannelPeriod(ch, ch.period + ch.periodoffset);
@@ -299,7 +303,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   var inst = ch.inst;
   var samp, sample_end;
   var loop = false;
-  var looplen = 0;
+  var looplen = 0, loopstart = 0;
 
   // nothing on this channel, just filter the last dc offset back down to zero
   if (inst == undefined || ch.mute) {
@@ -310,8 +314,9 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   sample_end = inst.len;
   if ((inst.type & 3) == 1) { // todo: support pingpong
     loop = true;
+    loopstart = inst.loop;
     looplen = inst.looplen;
-    sample_end = looplen + inst.loop;
+    sample_end = loopstart + looplen;
   }
   var samplen = inst.len;
   var volE = ch.volE / 64.0;    // current volume envelope
@@ -330,50 +335,125 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   var k = ch.off;
   var dk = ch.doff;
   var Vrms = 0;
-  for (var i = start; i < end; i++) {
+  var f0 = ch.filter[0], f1 = ch.filter[1], f2 = ch.filter[2];
+  var fs0 = ch.filterstate[0], fs1 = ch.filterstate[1], fs2 = ch.filterstate[2];
+
+  // we also low-pass filter volume changes with a simple one-zero,
+  // one-pole filter to avoid pops and clicks when volume changes.
+  var vL = popfilter_alpha * ch.vL + (1 - popfilter_alpha) * (volL + ch.vLprev) * 0.5;
+  var vR = popfilter_alpha * ch.vR + (1 - popfilter_alpha) * (volR + ch.vRprev) * 0.5;
+  var pf_8 = Math.pow(popfilter_alpha, 8);
+  ch.vLprev = volL;
+  ch.vRprev = volR;
+
+  // we can mix up to this many bytes before running into a sample end/loop
+  var i = start;
+  while (i < end) {
     if (k >= sample_end) {  // TODO: implement pingpong looping
       if (loop) {
-        k %= looplen;
+        k = loopstart + (k - loopstart) % looplen;
       } else {
         // kill sample
         ch.inst = undefined;
         // fill rest of buf with filtered dc offset using loop above
-        return Vrms + MixSilenceIntoBuf(ch, i+1, end, dataL, dataR);
+        return Vrms + MixSilenceIntoBuf(ch, i, end, dataL, dataR);
       }
     }
-    var s = samp[k|0];
-    // TODO: robustify, then remove these NaN checks from the inner loops
-    if (isNaN(s)) {
-      console.log("NaN sample idx", samp.length, k|0);
-      tempo = 10000;
-      break;
+    var next_event = Math.min(end, i + (sample_end - k) / dk);
+    // this is the inner loop of the player
+
+    // unrolled 8x
+    for (; i + 8 < next_event; i+=8) {
+      var s = samp[k|0];
+      var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
+      fs2 = fs1; fs1 = y; fs0 = s;
+      k += dk;
+      dataL[i] += vL * y;
+      dataR[i] += vR * y;
+      Vrms += (vL + vR) * y * y;
+
+      var s = samp[k|0];
+      var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
+      fs2 = fs1; fs1 = y; fs0 = s;
+      k += dk;
+      dataL[i+1] += vL * y;
+      dataR[i+1] += vR * y;
+      Vrms += (vL + vR) * y * y;
+
+      var s = samp[k|0];
+      var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
+      fs2 = fs1; fs1 = y; fs0 = s;
+      k += dk;
+      dataL[i+2] += vL * y;
+      dataR[i+2] += vR * y;
+      Vrms += (vL + vR) * y * y;
+
+      var s = samp[k|0];
+      var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
+      fs2 = fs1; fs1 = y; fs0 = s;
+      k += dk;
+      dataL[i+3] += vL * y;
+      dataR[i+3] += vR * y;
+      Vrms += (vL + vR) * y * y;
+
+      var s = samp[k|0];
+      var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
+      fs2 = fs1; fs1 = y; fs0 = s;
+      k += dk;
+      dataL[i+4] += vL * y;
+      dataR[i+4] += vR * y;
+      Vrms += (vL + vR) * y * y;
+
+      var s = samp[k|0];
+      var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
+      fs2 = fs1; fs1 = y; fs0 = s;
+      k += dk;
+      dataL[i+5] += vL * y;
+      dataR[i+5] += vR * y;
+      Vrms += (vL + vR) * y * y;
+
+      var s = samp[k|0];
+      var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
+      fs2 = fs1; fs1 = y; fs0 = s;
+      k += dk;
+      dataL[i+6] += vL * y;
+      dataR[i+6] += vR * y;
+      Vrms += (vL + vR) * y * y;
+
+      var s = samp[k|0];
+      var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
+      fs2 = fs1; fs1 = y; fs0 = s;
+      k += dk;
+      dataL[i+7] += vL * y;
+      dataR[i+7] += vR * y;
+      Vrms += (vL + vR) * y * y;
+
+      vL = pf_8 * vL + (1 - pf_8) * volL;
+      vR = pf_8 * vR + (1 - pf_8) * volR;
     }
-    // we low-pass filter here since we are resampling some arbitrary
-    // frequency to f_smp; this is an anti-aliasing filter and is
-    // implemented as an IIR butterworth filter (usually we'd use an FIR
-    // brick wall filter, but this is much simpler computationally and
-    // sounds fine)
-    var si = ch.filter[0] * (s + ch.filterstate[0]) +
-      ch.filter[1]*ch.filterstate[1] + ch.filter[2]*ch.filterstate[2];
-    if (isNaN(si)) {
-      console.log("NaN after filter sample idx", samp, k|0, ch.filter, ch.filterstate, s);
-      break;
+
+    for (; i < next_event; i++) {
+      var s = samp[k|0];
+      // we low-pass filter here since we are resampling some arbitrary
+      // frequency to f_smp; this is an anti-aliasing filter and is
+      // implemented as an IIR butterworth filter (usually we'd use an FIR
+      // brick wall filter, but this is much simpler computationally and
+      // sounds fine)
+      var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
+      fs2 = fs1; fs1 = y; fs0 = s;
+      dataL[i] += vL * y;
+      dataR[i] += vR * y;
+      Vrms += (vL + vR) * y * y;
+      k += dk;
     }
-    ch.filterstate[2] = ch.filterstate[1];
-    ch.filterstate[1] = si; ch.filterstate[0] = s;
-    // we also low-pass filter volume changes with a simple one-zero,
-    // one-pole filter to avoid pops and clicks when volume changes.
-    ch.vL = popfilter_alpha * ch.vL + (1 - popfilter_alpha) * (volL + ch.vLprev) * 0.5;
-    ch.vR = popfilter_alpha * ch.vR + (1 - popfilter_alpha) * (volR + ch.vRprev) * 0.5;
-    ch.vLprev = volL;
-    ch.vRprev = volR;
-    dataL[i] += ch.vL * si;
-    dataR[i] += ch.vR * si;
-    Vrms += (ch.vL + ch.vR) * si * si;
-    k += dk;
   }
   ch.off = k;
   ch.doff = dk;
+  ch.filterstate[0] = fs0;
+  ch.filterstate[1] = fs1;
+  ch.filterstate[2] = fs2;
+  ch.vL = vL;
+  ch.vR = vR;
   return Vrms * 0.5;
 }
 
@@ -383,15 +463,9 @@ function audio_cb(e) {
   var dataL = e.outputBuffer.getChannelData(0);
   var dataR = e.outputBuffer.getChannelData(1);
 
-  // backward compat w/ no array.fill
-  if (dataL.fill === undefined) {
-    for (var i = 0; i < buflen; i++) {
-      dataL[i] = 0;
-      dataR[i] = 0;
-    }
-  } else {
-    dataL.fill(0);
-    dataR.fill(0);
+  for (var i = 0; i < buflen; i++) {
+    dataL[i] = 0;
+    dataR[i] = 0;
   }
 
   var offset = 0;
@@ -413,22 +487,24 @@ function audio_cb(e) {
     buflen -= tickduration;
   }
 
-  // update VU meters
-  var canvas = document.getElementById("vu");
-  var ctx = canvas.getContext("2d");
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, 16 * nchan, 64);
-  ctx.fillStyle = '#0f0';
-  for (var j = 0; j < nchan; j++) {
-    var rms = VU[j] / e.outputBuffer.length;
-    var y = -Math.log(rms)*10;
-    ctx.fillRect(j*16, y, 15, 64-y);
-  }
+  window.requestAnimationFrame(function() {
+    // update VU meters
+    var canvas = document.getElementById("vu");
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, 16 * nchan, 64);
+    ctx.fillStyle = '#0f0';
+    for (var j = 0; j < nchan; j++) {
+      var rms = VU[j] / e.outputBuffer.length;
+      var y = -Math.log(rms)*10;
+      ctx.fillRect(j*16, y, 15, 64-y);
+    }
 
-  var debug = document.getElementById("debug");
-  debug.innerHTML = 'pat ' + cur_pat + ' row ' + (cur_row-1);
-  var pat = document.getElementById("pattern");
-  pat.innerHTML = patdisplay.join("\n");
+    var debug = document.getElementById("debug");
+    debug.innerHTML = 'pat ' + cur_pat + ' row ' + (cur_row-1);
+    var pat = document.getElementById("pattern");
+    pat.innerHTML = patdisplay.join("\n");
+  });
 }
 
 function eff_t0_0(ch, data) {  // arpeggio
@@ -692,7 +768,7 @@ function UnrollSampleLoop(inst) {
     samp[i] = inst.sampledata[i];
   }
   for (var j = 0; j < nloops; j++) {
-    if (j&1 && pingpong) {
+    if ((j&1) && pingpong) {
       for (var k = inst.looplen - 1; k >= 0; k--) {
         samp[i++] = inst.sampledata[inst.loop + k];
       }
@@ -702,9 +778,10 @@ function UnrollSampleLoop(inst) {
       }
     }
   }
+  console.log("unrolled sample loop", inst.number, "looplen", inst.looplen, "x", nloops, " = ", samplesiz);
   inst.sampledata = samp;
   inst.looplen = nloops * inst.looplen;
-  inst.type &= ~2;
+  inst.type = 1;
 }
 
 function playXM(arrayBuf) {
@@ -725,8 +802,6 @@ function playXM(arrayBuf) {
   for (var i = 0; i < nchan; i++) {
     channelinfo.push({
       filterstate: new Float32Array(3),
-      popfilter: FilterCoeffs(200.0 / 44100.0),
-      popfilterstate: [new Float32Array(3), new Float32Array(3)],
       vol: 0,
       pan: 128,
       vL: 0, vR: 0,   // left right volume envelope followers (changes per sample)
@@ -855,6 +930,7 @@ function playXM(arrayBuf) {
       idx += totalsamples;
       inst = {
         'name': instname,
+        'number': i,
         'len': samplen, 'loop': samploop,
         'looplen': samplooplen, 'note': sampnote, 'fine': sampfinetune,
         'pan': samppan, 'type': samptype, 'vol': sampvol,
@@ -869,7 +945,7 @@ function playXM(arrayBuf) {
       }
 
       // unroll short loops and any pingpong loops
-      if ((inst.type & 1) && (inst.looplen < 2048 || (inst.type & 2))) {
+      if ((inst.type & 3) && (inst.looplen < 2048 || (inst.type & 2))) {
         UnrollSampleLoop(inst);
       }
 
