@@ -123,23 +123,37 @@ var channelinfo = [];
 var instruments = [];
 var tempo = 4;
 
-// Return 2-pole Butterworth lowpass filter coefficients for
-// center frequncy f_c (relative to sampling frequency)
-function FilterCoeffs(f_c) {
-  //  if (f_c > 0.5) {  // we can't lowpass above the nyquist frequency...
-  //    return [1, 0, 0];
-  //  }
-  //  what happens instead is the filter wraps around to an alias frequency,
-  //  and that also works OK, though it isn't strictly right... FIXME
-  var wct = Math.sqrt(2) * Math.PI * f_c;
-  var e = Math.exp(-wct);
-  var c = e * Math.cos(wct);
-  var s = e * Math.sin(wct);
+// compute coefficients for a pole pair biquad section (with a single implied
+// zero at z=-1); pole_r and _i are the real and imaginary components of the
+// pole in the s (Laplace) plane, which are then scaled by w_c and projected
+// into the z domain.
+function SetBiquadCoeffs(s_pole_r, s_pole_i, f_c, poleno, filter) {
+  var w = 2 * Math.PI * f_c;
+  var e = Math.exp(s_pole_r * w);
+  var c = e * Math.cos(s_pole_i * w);
+  var s = e * Math.sin(s_pole_i * w);
   var gain = (1 - 2*c + c*c + s*s) / 2;
-  return [gain, 2*c, -c*c - s*s];
+  filter[3*poleno + 0] = gain;
+  filter[3*poleno + 1] = 2*c;
+  filter[3*poleno + 2] = -c*c - s*s;
 }
 
-popfilter = FilterCoeffs(200.0 / 44100.0);
+// Return 4-pole lowpass filter coefficients for center frequncy f_c (relative
+// to sampling frequency)
+function SetFilterCoeffs(f_c, filter) {
+  if (f_c > 0.5) {  // we can't lowpass above the nyquist frequency...
+    f_c = 0.5;
+  }
+
+  // This is the pole pair in the s plane we're going to use.
+  // It's a fairly resonant filter but it is designed to work together with the
+  // comb filter implied by using nearest-neighbor downsampling first, so the
+  // combination of the two has a nearly flat passband and a decently sharp
+  // cutoff for a 2-pole filter.
+  SetBiquadCoeffs(-0.47143406, 0.46783542, f_c, 0, filter);
+  SetBiquadCoeffs(-0.10882119, 0.91627743, f_c, 1, filter);
+}
+
 popfilter_alpha = 0.9837;
 
 function UpdateChannelPeriod(ch, period) {
@@ -149,7 +163,7 @@ function UpdateChannelPeriod(ch, period) {
     return;
   }
   ch.doff = freq / f_smp;
-  ch.filter = FilterCoeffs(ch.doff / 2);
+  SetFilterCoeffs(ch.doff / 2, ch.filter);
 }
 
 function PeriodForNote(ch, note) {
@@ -468,8 +482,10 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   var k = ch.off;
   var dk = ch.doff;
   var Vrms = 0;
-  var f0 = ch.filter[0], f1 = ch.filter[1], f2 = ch.filter[2];
-  var fs0 = ch.filterstate[0], fs1 = ch.filterstate[1], fs2 = ch.filterstate[2];
+  var f0g = ch.filter[0], f01 = ch.filter[1], f02 = ch.filter[2];
+  var f1g = ch.filter[3], f11 = ch.filter[4], f12 = ch.filter[5];
+  var f0x = ch.filterstate[0], f0y1 = ch.filterstate[1], f0y2 = ch.filterstate[2];
+  var f1x = ch.filterstate[3], f1y1 = ch.filterstate[4], f1y2 = ch.filterstate[5];
 
   // we also low-pass filter volume changes with a simple one-zero,
   // one-pole filter to avoid pops and clicks when volume changes.
@@ -500,6 +516,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
     var next_event = Math.max(1, Math.min(end, i + (sample_end - k) / dk));
     // this is the inner loop of the player
 
+    /* TODO after new filter
     // unrolled 8x
     for (; i + 7 < next_event; i+=8) {
       var s = samp[k|0];
@@ -569,26 +586,35 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
       vL = pf_8 * vL + (1 - pf_8) * volL;
       vR = pf_8 * vR + (1 - pf_8) * volR;
     }
+    */
 
     for (; i < next_event; i++) {
       var s = samp[k|0];
       // we low-pass filter here since we are resampling some arbitrary
       // frequency to f_smp; this is an anti-aliasing filter and is
-      // implemented as an IIR butterworth filter (usually we'd use an FIR
-      // brick wall filter, but this is much simpler computationally and
-      // sounds fine)
-      var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
-      fs2 = fs1; fs1 = y; fs0 = s;
-      dataL[i] += vL * y;
-      dataR[i] += vR * y;
-      Vrms += (vL + vR) * y * y;
+      // implemented as an IIR filter (usually we'd use an FIR brick wall
+      // filter, but this is much simpler computationally and sounds fine)
+      // the filter is a cascade of two biquad sections here
+      var y0 = f0g * (s + f0x) + f01*f0y1 + f02*f0y2;
+      f0y2 = f0y1; f0y1 = y0; f0x = s;
+      var y1 = f1g * (y0 + f1x) + f11*f1y1 + f12*f1y2;
+      f1y2 = f1y1; f1y1 = y1; f1x = y0;
+      dataL[i] += vL * y1;
+      dataR[i] += vR * y1;
+      Vrms += (vL + vR) * y1 * y1;
       k += dk;
+
+      vL = popfilter_alpha * vL + (1 - popfilter_alpha) * volL;
+      vR = popfilter_alpha * vR + (1 - popfilter_alpha) * volR;
     }
   }
   ch.off = k;
-  ch.filterstate[0] = fs0;
-  ch.filterstate[1] = fs1;
-  ch.filterstate[2] = fs2;
+  ch.filterstate[0] = f0x;
+  ch.filterstate[1] = f0y1;
+  ch.filterstate[2] = f0y2;
+  ch.filterstate[3] = f1x;
+  ch.filterstate[4] = f1y1;
+  ch.filterstate[5] = f1y2;
   ch.vL = vL;
   ch.vR = vR;
   return Vrms * 0.5;
@@ -931,7 +957,8 @@ function playXM(arrayBuf) {
   document.getElementById('vu').width = 16 * nchan;
   for (var i = 0; i < nchan; i++) {
     channelinfo.push({
-      filterstate: new Float32Array(3),
+      filter: new Float32Array(6),
+      filterstate: new Float32Array(6),
       vol: 0,
       pan: 128,
       period: 1920 - 48*16,
