@@ -919,24 +919,27 @@ function playXM(arrayBuf) {
       var totalsamples = 0;
       for (var j = 0; j < nsamp; j++) {
         var samplen = dv.getUint32(idx, true);
-        var samploop = dv.getUint32(idx+4, true);
-        var samplooplen = dv.getUint32(idx+8, true);
-        var sampvol = dv.getUint8(idx+12);
-        var sampfinetune = dv.getInt8(idx+13);
-        var samptype = dv.getUint8(idx+14);
-        var samppan = dv.getUint8(idx+15);
-        var sampnote = dv.getInt8(idx+16);
-        var sampname = getstring(dv, idx+18, 22);
-        var sampleoffset = idx + samphdrsiz;
-        console.log("sample %d: len %d name '%s' loop %d/%d vol %d",
-            j, samplen, sampname, samploop, samplooplen, sampvol);
-        console.log("           type %d note %s(%d) finetune %d pan %d",
-            samptype, prettify_note(sampnote + 12*4), sampnote, sampfinetune, samppan);
-        console.log("           vol env", env_vol, env_vol_sustain,
-            env_vol_loop_start, env_vol_loop_end, "type", env_vol_type,
-            "fadeout", vol_fadeout);
-        console.log("           pan env", env_pan, env_pan_sustain,
-            env_pan_loop_start, env_pan_loop_end, "type", env_pan_type);
+        if (j == 0) {
+          var samplen0 = samplen;  // FIXME HACK HACK HACK
+          var samploop = dv.getUint32(idx+4, true);
+          var samplooplen = dv.getUint32(idx+8, true);
+          var sampvol = dv.getUint8(idx+12);
+          var sampfinetune = dv.getInt8(idx+13);
+          var samptype = dv.getUint8(idx+14);
+          var samppan = dv.getUint8(idx+15);
+          var sampnote = dv.getInt8(idx+16);
+          var sampname = getstring(dv, idx+18, 22);
+          var sampleoffset = idx + samphdrsiz;
+          console.log("sample %d: len %d name '%s' loop %d/%d vol %d",
+              j, samplen, sampname, samploop, samplooplen, sampvol);
+          console.log("           type %d note %s(%d) finetune %d pan %d",
+              samptype, prettify_note(sampnote + 12*4), sampnote, sampfinetune, samppan);
+          console.log("           vol env", env_vol, env_vol_sustain,
+              env_vol_loop_start, env_vol_loop_end, "type", env_vol_type,
+              "fadeout", vol_fadeout);
+          console.log("           pan env", env_pan, env_pan_sustain,
+              env_pan_loop_start, env_pan_loop_end, "type", env_pan_type);
+        }
         idx += samphdrsiz;
         totalsamples += samplen;
       }
@@ -944,12 +947,12 @@ function playXM(arrayBuf) {
       inst = {
         'name': instname,
         'number': i,
-        'len': samplen, 'loop': samploop,
+        'len': samplen0, 'loop': samploop,
         'looplen': samplooplen, 'note': sampnote, 'fine': sampfinetune,
         'pan': samppan, 'type': samptype, 'vol': sampvol,
         'fine': sampfinetune,
         'fadeout': vol_fadeout,
-        'sampledata': ConvertSample(new Uint8Array(arrayBuf, sampleoffset, samplen), samptype & 16),
+        'sampledata': ConvertSample(new Uint8Array(arrayBuf, sampleoffset, samplen0), samptype & 16),
       };
       if (samptype & 16) {
         inst.len /= 2;
