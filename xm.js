@@ -318,13 +318,12 @@ function EnvelopeFollower(env) {
 
 EnvelopeFollower.prototype.Tick = function(release) {
   var value = this.env.Get(this.tick);
-  if (this.env.type & 2) {  // sustain?
-    // if we're sustaining a note, stop advancing the tick counter
-    if (!release &&
-        this.tick >= this.env.points[this.env.sustain*2]) {
-      return this.env.points[this.env.sustain*2 + 1];
-    }
+
+  // if we're sustaining a note, stop advancing the tick counter
+  if (!release && this.tick >= this.env.points[this.env.sustain*2]) {
+    return this.env.points[this.env.sustain*2 + 1];
   }
+
   this.tick++;
   if (this.env.type & 4) {  // envelope loop?
     if (!release &&
@@ -999,7 +998,7 @@ function playXM(arrayBuf) {
       var env_pan_sustain = dv.getUint8(idx+230);
       var env_pan_loop_start = dv.getUint8(idx+231);
       var env_pan_loop_end = dv.getUint8(idx+232);
-      var vol_fadeout = dv.getUint16(idx+239);
+      var vol_fadeout = dv.getUint16(idx+239, true);
       var env_vol = [];
       for (var j = 0; j < env_nvol*2; j++) {
         env_vol.push(dv.getUint16(idx+129+j*2, true));
@@ -1067,6 +1066,9 @@ function playXM(arrayBuf) {
         // insert an automatic fadeout to 0 at the end of the envelope
         var env_end_tick = env_vol[env_vol.length-2];
         var fadeout_ticks = 65536.0 / inst.fadeout;
+        if (!(env_vol_type & 2)) {  // if there's no sustain point, create one
+          env_vol_sustain = env_vol.length / 2;
+        }
         env_vol.push(env_end_tick + fadeout_ticks);
         env_vol.push(0);
         inst.env_vol = new Envelope(
@@ -1080,6 +1082,9 @@ function playXM(arrayBuf) {
         inst.env_vol = new Envelope([0, 64, fadeout_ticks, 0], 2, 0, 0, 0);
       }
       if (env_pan_type) {
+        if (!(env_pan_type & 2)) {  // if there's no sustain point, create one
+          env_pan_sustain = env_pan.length / 2;
+        }
         inst.env_pan = new Envelope(
             env_pan,
             env_pan_type,
