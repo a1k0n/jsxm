@@ -320,7 +320,9 @@ function next_row() {
       ch.vibratopos = 0;
       ch.env_vol = new EnvelopeFollower(inst.env_vol);
       ch.env_pan = new EnvelopeFollower(inst.env_pan);
-      ch.period = PeriodForNote(ch, note);
+      if (note) {
+        ch.period = PeriodForNote(ch, note);
+      }
     }
   }
 }
@@ -460,7 +462,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   if (volR == 0 && volL == 0)
     return;
   if (isNaN(volR) || isNaN(volL)) {
-    console.log("NaN volume!?", volL, volR, colE, panE, ch.vol);
+    console.log("NaN volume!?", volL, volR, volE, panE, ch.vol);
     return;
   }
   var k = ch.off;
