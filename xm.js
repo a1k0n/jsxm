@@ -252,12 +252,23 @@ function next_row() {
         }
       }
     }
+
+    ch.voleffectfn = undefined;
     if (r[i][2] != -1) {  // volume column
       var v = r[i][2];
+      ch.voleffectdata = v & 0x0f;
       if (v < 0x10) {
         console.log("channel", i, "invalid volume", v.toString(16));
       } else if (v <= 0x50) {
         ch.vol = v - 0x10;
+      } else if (v >= 0x60 && v < 0x70) {  // volume slide down
+        ch.voleffectfn = function() {
+          ch.vol = Math.max(0, ch.vol - ch.voleffectdata);
+        }
+      } else if (v >= 0x70 && v < 0x80) {  // volume slide up
+        ch.voleffectfn = function() {
+          ch.vol = Math.min(64, ch.vol + ch.voleffectdata);
+        }
       } else if (v >= 0x80 && v < 0x90) {  // fine volume slide down
         ch.vol = Math.max(0, ch.vol - (v & 0x0f));
       } else if (v >= 0x90 && v < 0xa0) {  // fine volume slide up
@@ -373,8 +384,9 @@ function next_tick() {
     var ch = channelinfo[j];
     var inst = ch.inst;
     ch.periodoffset = 0;
-    if (cur_tick != 0 && ch.effectfn) {
-      ch.effectfn(ch);
+    if (cur_tick != 0) {
+      if(ch.voleffectfn) ch.voleffectfn(ch);
+      if(ch.effectfn) ch.effectfn(ch);
     }
     if (isNaN(ch.period)) {
       console.log(prettify_notedata(patterns[cur_pat][cur_row-1][j]),
