@@ -309,8 +309,8 @@ function next_row() {
           // alone
           ch.envtick = 0;
           ch.release = 0;
-          ch.env_vol = new EnvelopeFollower(inst.env_vol, inst.fadeout);
-          ch.env_pan = new EnvelopeFollower(inst.env_pan, 0);
+          ch.env_vol = new EnvelopeFollower(inst.env_vol);
+          ch.env_pan = new EnvelopeFollower(inst.env_pan);
         }
       }
     }
@@ -691,7 +691,7 @@ function eff_t0_b(ch, data) {  // song jump (untested)
 }
 
 function eff_t0_c(ch, data) {  // set volume
-  ch.vol = data & 0x3f;
+  ch.vol = Math.min(64, data);
 }
 
 function eff_t0_d(ch, data) {  // pattern jump
@@ -1085,12 +1085,14 @@ function playXM(arrayBuf) {
       if (env_vol_type) {
         // insert an automatic fadeout to 0 at the end of the envelope
         var env_end_tick = env_vol[env_vol.length-2];
-        var fadeout_ticks = 65536.0 / inst.fadeout;
         if (!(env_vol_type & 2)) {  // if there's no sustain point, create one
           env_vol_sustain = env_vol.length / 2;
         }
-        env_vol.push(env_end_tick + fadeout_ticks);
-        env_vol.push(0);
+        if (inst.fadeout > 0) {
+          var fadeout_ticks = 65536.0 / inst.fadeout;
+          env_vol.push(env_end_tick + fadeout_ticks);
+          env_vol.push(0);
+        }
         inst.env_vol = new Envelope(
             env_vol,
             env_vol_type,
@@ -1098,8 +1100,9 @@ function playXM(arrayBuf) {
             env_vol_loop_start,
             env_vol_loop_end);
       } else {
-        // create a default envelope w/ fadeout
-        inst.env_vol = new Envelope([0, 64, fadeout_ticks, 0], 2, 0, 0, 0);
+        // no envelope, then just make a default full-volume envelope.
+        // i thought this would use fadeout, but apparently it doesn't.
+        inst.env_vol = new Envelope([0, 64, 1, 0], 2, 0, 0, 0);
       }
       if (env_pan_type) {
         if (!(env_pan_type & 2)) {  // if there's no sustain point, create one
