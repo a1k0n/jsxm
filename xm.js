@@ -320,7 +320,9 @@ function next_row() {
       ch.vibratopos = 0;
       ch.env_vol = new EnvelopeFollower(inst.env_vol);
       ch.env_pan = new EnvelopeFollower(inst.env_pan);
-      ch.period = PeriodForNote(ch, ch.note);
+      if (ch.note != undefined) {
+        ch.period = PeriodForNote(ch, ch.note);
+      }
     }
   }
 }
