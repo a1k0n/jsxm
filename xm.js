@@ -219,20 +219,23 @@ function next_row() {
   cur_row++;
   for (var i = 0; i < r.length; i++) {
     var ch = channelinfo[i];
+    var inst = ch.inst;
     ch.update = false;
     var triggernote = false;
     // instrument trigger
     if (r[i][1] != -1) {
-      var inst = instruments[r[i][1] - 1];
+      inst = instruments[r[i][1] - 1];
       if (inst != undefined) {
         ch.inst = inst;
         // retrigger unless overridden below
         triggernote = true;
-        // new instrument doesn ot reset volume!
+        ch.pan = inst.pan;
+        ch.vol = inst.vol;
       } else {
         // console.log("invalid inst", r[i][1], instruments.length);
       }
     }
+
     // note trigger
     if (r[i][0] != -1) {
       if (r[i][0] == 96) {
@@ -241,14 +244,10 @@ function next_row() {
       } else {
         // assume linear frequency table (flags header & 1 == 1)
         // is this true in kamel.xm?
-        var inst = ch.inst;
         if (inst != undefined) {
           var note = r[i][0] + inst.note;
           ch.note = note;
           triggernote = true;
-          // if there's an instrument and a note, set the volume
-          ch.pan = inst.pan;
-          ch.vol = inst.vol;
         }
       }
     }
@@ -320,9 +319,7 @@ function next_row() {
       ch.vibratopos = 0;
       ch.env_vol = new EnvelopeFollower(inst.env_vol);
       ch.env_pan = new EnvelopeFollower(inst.env_pan);
-      if (note) {
-        ch.period = PeriodForNote(ch, note);
-      }
+      ch.period = PeriodForNote(ch, ch.note);
     }
   }
 }
