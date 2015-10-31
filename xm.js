@@ -1,7 +1,101 @@
+var songname = '';
+var fontimg = new Image();
+var pat_canvas = document.createElement('canvas');
+fontimg.onload = function() {
+  /* NO!!!!!
+  var canv = document.createElement('canvas');
+  canv.width = fontimg.width;
+  canv.height = fontimg.height;
+  var c = canv.getContext('2d');
+  c.drawImage(fontimg, 0, 0);
+  var image_data = c.getImageData(0, 0, fontimg.width, fontimg.height);
+  var idx = 0;
+  var data = image_data.data;
+  for(var i = 0; i < fontimg.height; i++) {
+    for(var j = 0; j < fontimg.width; j++) {
+      // image_data.data[((i*(img.width*4)) + (j*4) + 3)] = 127;
+      if (data[idx] == 0)
+        data[idx+3] = 0;
+      idx += 4;
+    }
+  }
+  c.putImageData(image_data, 0, 0);
+  fontimg = canv;
+  */
+};
+
+fontimg.src = "ft2font.png";
+
 var _note_names = ["C-", "C#", "D-", "D#", "E-", "F-", "F#", "G-", "G#", "A-", "A#", "B-"];
 var f_smp = 44100;  // updated by play callback, default value here
 
 audioContext = window.AudioContext || window.webkitAudioContext;
+
+var _fontmap_notes = [8*5, 8*22, 8*28];
+var _pattern_cellwidth = 16 + 4 + 8 + 4 + 8 + 16 + 4;
+var _pattern_border = 20;
+var pat_canvas_patnum;
+function RenderPattern(canv, pattern) {
+  // a pattern consists of NxM cells which look like
+  // N-O II VV EFF
+  var cellwidth = _pattern_cellwidth;
+  canv.width = pattern[0].length * cellwidth + _pattern_border;
+  canv.height = pattern.length * 8;
+  var ctx = canv.getContext('2d');
+  ctx.fillcolor='#000';
+  ctx.fillRect(0, 0, canv.width, canv.height);
+  for (var j = 0; j < pattern.length; j++) {
+    var row = pattern[j];
+    var dy = j * 8;
+    // render row number
+    ctx.drawImage(fontimg, 8*(j>>4), 0, 8, 8, 2, dy, 8, 8);
+    ctx.drawImage(fontimg, 8*(j&15), 0, 8, 8, 10, dy, 8, 8);
+
+    for (var i = 0; i < row.length; i++) {
+      var dx = i*cellwidth + 2 + _pattern_border;
+      var data = row[i];
+
+      // render note
+      var note = data[0];
+      if (note < 0) {
+        ctx.drawImage(fontimg, 0, 8*5, 16, 8, dx, dy, 16, 8);
+      } else {
+        var octave = (note/12)|0;
+        var note_fontrow = _fontmap_notes[(octave/3)|0];
+        note = (note % (12*3))|0;
+        ctx.drawImage(fontimg, 16+16*note, note_fontrow, 16, 8, dx, dy, 16, 8);
+      }
+      dx += 20;
+
+      // render instrument
+      var inst = data[1];
+      if (inst != -1) {  // no instrument = render nothing
+        ctx.drawImage(fontimg, 8*(inst>>4), 4*8, 4, 8, dx, dy, 4, 8);
+        ctx.drawImage(fontimg, 8*(inst&15), 4*8, 4, 8, dx+4, dy, 4, 8);
+      }
+      dx += 12;
+
+      // render volume
+      var vol = data[2];
+      if (vol < 0x10) {
+        ctx.drawImage(fontimg, 312, 0, 8, 8, dx, dy, 8, 8);
+      } else {
+        vol -= 0x10;
+        ctx.drawImage(fontimg, 8*(vol>>4), 4*8, 4, 8, dx, dy, 4, 8);
+        ctx.drawImage(fontimg, 8*(vol&15), 4*8, 4, 8, dx+4, dy, 4, 8);
+      }
+      dx += 8;
+
+      // render effect
+      var eff = data[3];
+      var effdata = data[4];
+      ctx.drawImage(fontimg, 8*eff + 16*8, 4*8, 8, 8, dx, dy, 8, 8);
+      dx += 8;
+      ctx.drawImage(fontimg, 8*(effdata>>4), 4*8, 4, 8, dx, dy, 4, 8);
+      ctx.drawImage(fontimg, 8*(effdata&15), 4*8, 4, 8, dx+4, dy, 4, 8);
+    }
+  }
+}
 
 function prettify_note(note) {
   if (note < 0) return "---";
@@ -94,11 +188,9 @@ function next_row() {
   var p = patterns[cur_pat];
   var r = p[cur_row];
   cur_row++;
-  pretty_row = [];
   for (var i = 0; i < r.length; i++) {
     var ch = channelinfo[i];
     ch.update = false;
-    pretty_row.push(prettify_notedata(r[i]));
     var triggernote = false;
     // instrument trigger
     if (r[i][1] != -1) {
@@ -190,10 +282,6 @@ function next_row() {
       ch.env_pan = new EnvelopeFollower(inst.env_pan);
       ch.period = PeriodForNote(ch, note);
     }
-  }
-  patdisplay.push(pretty_row.join("  "));
-  if (patdisplay.length > 16) {
-    patdisplay.shift();
   }
 }
 
@@ -508,9 +596,21 @@ function audio_cb(e) {
     }
 
     var debug = document.getElementById("debug");
-    debug.innerHTML = 'pat ' + cur_pat + ' row ' + (cur_row-1);
-    var pat = document.getElementById("pattern");
-    pat.innerHTML = patdisplay.join("\n");
+    debug.innerHTML = songname + '<br>pat ' + cur_pat + ' row ' + (cur_row-1);
+
+    var gfx = document.getElementById("gfxpattern");
+    if (cur_pat != pat_canvas_patnum) {
+      RenderPattern(pat_canvas, patterns[cur_pat]);
+      pat_canvas_patnum = cur_pat;
+    }
+    var ctx = gfx.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, gfx.width, gfx.height);
+    ctx.fillStyle = '#2a5684';
+    ctx.fillRect(0, gfx.height/2 - 4, gfx.width, 8);
+    ctx.globalCompositeOperation = 'lighten';
+    ctx.drawImage(pat_canvas, 0, gfx.height / 2 - 4 - 8*(cur_row - 1));
+    ctx.globalCompositeOperation = 'source-over';
   });
 }
 
@@ -799,7 +899,7 @@ function playXM(arrayBuf) {
   var dv = new DataView(arrayBuf);
   window.dv = dv;
 
-  var name = getstring(dv, 17, 20);
+  songname = getstring(dv, 17, 20);
   var hlen = dv.getUint32(0x3c, true) + 0x3c;
   var songlen = dv.getUint16(0x40, true);
   song_looppos = dv.getUint16(0x42, true);
@@ -847,7 +947,6 @@ function playXM(arrayBuf) {
     idx += 9;
     for (var j = 0; patsize > 0 && j < patrows; j++) {
       row = [];
-      pretty_row = [];
       for (var k = 0; k < nchan; k++) {
         var byte0 = dv.getUint8(idx); idx++;
         var note = -1, inst = -1, vol = -1, efftype = 0, effparam = 0;
@@ -877,7 +976,6 @@ function playXM(arrayBuf) {
           effparam = dv.getUint8(idx); idx++;
         }
         var notedata = [note, inst, vol, efftype, effparam];
-        pretty_row.push(prettify_notedata(notedata));
         row.push(notedata);
       }
       pattern.push(row);
@@ -1008,8 +1106,10 @@ function playXM(arrayBuf) {
   jsNode.connect(gainNode);
 
   var debug = document.getElementById("debug");
-  console.log("loaded \"" + name + "\"");
-  debug.innerHTML = name;
+  console.log("loaded \"" + songname + "\"");
+  debug.innerHTML = songname;
+  var gfxpattern = document.getElementById("gfxpattern");
+  gfxpattern.width = _pattern_cellwidth * nchan + _pattern_border;
 
   // start playing
   gainNode.connect(audioctx.destination);

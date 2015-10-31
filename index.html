@@ -3,10 +3,22 @@
   <script src="xm.js"></script>
 </head>
 <body>
+  <div><canvas id='vu' width=224 height=64></canvas></div>
+  <div><canvas id='gfxpattern' width=640 height=200></canvas></div>
+<pre id='debug'>
+</pre>
+<pre id='pattern'>
+</pre>
 <pre>
 code: <a href="http://github.com/a1k0n/jsxm/">github.com/a1k0n/jsxm</a>
-tune: my dirty old kamel - <a href="http://zalza.bandcamp.com">Zalza</a>
 todo:
+ - file picker, upload more xms to a host we can access cross-origin
+ - make display even more faithfully FT2-like
+ - sync display &amp; sound to 60Hz precision (right now it only updates at
+   about 10Hz)
+ - buffer the song more after that's done
+ - render instrument list
+ - oscilloscopes
  - fix bugs!
    - envelope loops - are they right or not now?
  - multi-sample instruments
@@ -15,12 +27,6 @@ todo:
    - E3x, E4x, E5x, E6x, E7x, E9x, EDx, EEx
    - 7xy - tremolo
    - Gxx, Hxy, Kxx, Lxx, Pxy, Txy
- - oscilloscopes
-</pre>
-<canvas id='vu' width=224 height=64></canvas>
-<pre id='debug'>
-</pre>
-<pre id='pattern'>
 </pre>
 </body>
 
