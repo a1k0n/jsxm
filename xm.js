@@ -184,8 +184,11 @@ function RedrawScreen() {
   if (e.row != shown_row) {
     var gfx = document.getElementById("gfxpattern");
     if (e.pat != pat_canvas_patnum) {
-      RenderPattern(pat_canvas, patterns[e.pat]);
-      pat_canvas_patnum = e.pat;
+      var p = patterns[e.pat];
+      if (p != undefined) {
+        RenderPattern(pat_canvas, patterns[e.pat]);
+        pat_canvas_patnum = e.pat;
+      }
     }
     var ctx = gfx.getContext('2d');
     ctx.fillStyle = '#000';
