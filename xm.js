@@ -634,10 +634,6 @@ function audio_cb(e) {
   }
 }
 
-function eff_t0_0(ch, data) {  // arpeggio
-  // nothing to do here, arpeggio will be done on ch.effectdata
-}
-
 function eff_t0_1(ch, data) {  // pitch slide up
   if (data != 0) {
     ch.slideupspeed = data;
@@ -752,7 +748,7 @@ function eff_unimplemented_t0(ch, data) {
 }
 
 var effects_t0 = [  // effect functions on tick 0
-  eff_t0_0,
+  eff_t1_0,  // 1, arpeggio is processed on all ticks
   eff_t0_1,
   eff_t0_2,
   eff_t0_3,
