@@ -1,27 +1,9 @@
+var audioctx;
 var songname = '';
 var fontimg = new Image();
 var pat_canvas = document.createElement('canvas');
 fontimg.onload = function() {
-  /* NO!!!!!
-  var canv = document.createElement('canvas');
-  canv.width = fontimg.width;
-  canv.height = fontimg.height;
-  var c = canv.getContext('2d');
-  c.drawImage(fontimg, 0, 0);
-  var image_data = c.getImageData(0, 0, fontimg.width, fontimg.height);
-  var idx = 0;
-  var data = image_data.data;
-  for(var i = 0; i < fontimg.height; i++) {
-    for(var j = 0; j < fontimg.width; j++) {
-      // image_data.data[((i*(img.width*4)) + (j*4) + 3)] = 127;
-      if (data[idx] == 0)
-        data[idx+3] = 0;
-      idx += 4;
-    }
-  }
-  c.putImageData(image_data, 0, 0);
-  fontimg = canv;
-  */
+  // FIXME: don't attempt to render until this loads
 };
 
 fontimg.src = "ft2font.png";
@@ -174,9 +156,56 @@ function PeriodForNote(ch, note) {
   return 1920 - note*16 - ch.inst.fine / 8.0;
 }
 
+var audio_events = [];
+var shown_row = undefined;
+function RedrawScreen() {
+  var e;
+  var t = audioctx.currentTime;
+  do {
+    e = audio_events.shift();
+  } while(e.t < t && audio_events.length > 0);
+  if (e == undefined) return;
+  var VU = e.vu;
+
+  // update VU meters
+  var canvas = document.getElementById("vu");
+  var ctx = canvas.getContext("2d");
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, 16 * nchan, 64);
+  ctx.fillStyle = '#0f0';
+  for (var j = 0; j < nchan; j++) {
+    var y = -Math.log(VU[j])*10;
+    ctx.fillRect(j*16, y, 15, 64-y);
+  }
+
+  var debug = document.getElementById("debug");
+  debug.innerHTML = songname + '<br>pat ' + e.pat + ' row ' + (e.row);
+
+  if (e.row != shown_row) {
+    var gfx = document.getElementById("gfxpattern");
+    if (e.pat != pat_canvas_patnum) {
+      RenderPattern(pat_canvas, patterns[e.pat]);
+      pat_canvas_patnum = e.pat;
+    }
+    var ctx = gfx.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, gfx.width, gfx.height);
+    ctx.fillStyle = '#2a5684';
+    ctx.fillRect(0, gfx.height/2 - 4, gfx.width, 8);
+    ctx.globalCompositeOperation = 'lighten';
+    ctx.drawImage(pat_canvas, 0, gfx.height / 2 - 4 - 8*(e.row));
+    ctx.globalCompositeOperation = 'source-over';
+    shown_row = e.row;
+  }
+
+  if (audio_events.length > 0) {
+    var next_event = audio_events[0].t;
+    setTimeout(RedrawScreen, 1000*(next_event - audioctx.currentTime));
+  }
+}
+
 var cur_songpos = -1, cur_pat = -1, cur_row = 64, cur_ticksamp = 0;
 var cur_tick = 6;
-var patdisplay = [];
 function next_row() {
   if (cur_pat == -1 || cur_row >= patterns[cur_pat].length) {
     cur_row = 0;
@@ -553,6 +582,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
 
 function audio_cb(e) {
   f_smp = audioctx.sampleRate;
+  var time_sound_started = undefined;
   var buflen = e.outputBuffer.length;
   var dataL = e.outputBuffer.getChannelData(0);
   var dataR = e.outputBuffer.getChannelData(1);
@@ -564,53 +594,33 @@ function audio_cb(e) {
 
   var offset = 0;
   var ticklen = 0|(f_smp * 2.5 / bpm);
-  var VU = new Float32Array(nchan);
 
   while(buflen > 0) {
-    if (cur_ticksamp >= ticklen) {
+    if (cur_pat == -1 || cur_ticksamp >= ticklen) {
       next_tick(f_smp);
       cur_ticksamp -= ticklen;
     }
     var tickduration = Math.min(buflen, ticklen - cur_ticksamp);
+    var VU = new Float32Array(nchan);
     for (var j = 0; j < nchan; j++) {
-      VU[j] += MixChannelIntoBuf(
-          channelinfo[j], offset, offset + tickduration, dataL, dataR);
+      VU[j] = MixChannelIntoBuf(
+          channelinfo[j], offset, offset + tickduration, dataL, dataR) /
+        tickduration;
+    }
+    audio_events.push({
+      t: e.playbackTime + (0.0 + offset) / f_smp,
+      vu: VU,
+      songpos: cur_songpos,
+      pat: cur_pat,
+      row: cur_row - 1
+    });
+    if (audio_events.length == 1) {
+      requestAnimationFrame(RedrawScreen);
     }
     offset += tickduration;
     cur_ticksamp += tickduration;
     buflen -= tickduration;
   }
-
-  window.requestAnimationFrame(function() {
-    // update VU meters
-    var canvas = document.getElementById("vu");
-    var ctx = canvas.getContext("2d");
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, 16 * nchan, 64);
-    ctx.fillStyle = '#0f0';
-    for (var j = 0; j < nchan; j++) {
-      var rms = VU[j] / e.outputBuffer.length;
-      var y = -Math.log(rms)*10;
-      ctx.fillRect(j*16, y, 15, 64-y);
-    }
-
-    var debug = document.getElementById("debug");
-    debug.innerHTML = songname + '<br>pat ' + cur_pat + ' row ' + (cur_row-1);
-
-    var gfx = document.getElementById("gfxpattern");
-    if (cur_pat != pat_canvas_patnum) {
-      RenderPattern(pat_canvas, patterns[cur_pat]);
-      pat_canvas_patnum = cur_pat;
-    }
-    var ctx = gfx.getContext('2d');
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, gfx.width, gfx.height);
-    ctx.fillStyle = '#2a5684';
-    ctx.fillRect(0, gfx.height/2 - 4, gfx.width, 8);
-    ctx.globalCompositeOperation = 'lighten';
-    ctx.drawImage(pat_canvas, 0, gfx.height / 2 - 4 - 8*(cur_row - 1));
-    ctx.globalCompositeOperation = 'source-over';
-  });
 }
 
 function eff_t0_0(ch, data) {  // arpeggio
@@ -1106,7 +1116,7 @@ function playXM(arrayBuf) {
   audioctx = new audioContext();
   gainNode = audioctx.createGain();
   gainNode.gain.value = 0.1;  // master volume
-  jsNode = audioctx.createScriptProcessor(4096, 0, 2);
+  jsNode = audioctx.createScriptProcessor(16384, 0, 2);
   jsNode.onaudioprocess = audio_cb;
   jsNode.connect(gainNode);
 
