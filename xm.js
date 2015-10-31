@@ -126,11 +126,9 @@ var tempo = 4;
 // Return 2-pole Butterworth lowpass filter coefficients for
 // center frequncy f_c (relative to sampling frequency)
 function FilterCoeffs(f_c) {
-  //  if (f_c > 0.5) {  // we can't lowpass above the nyquist frequency...
-  //    return [1, 0, 0];
-  //  }
-  //  what happens instead is the filter wraps around to an alias frequency,
-  //  and that also works OK, though it isn't strictly right... FIXME
+  if (f_c > 0.5) {  // we can't lowpass above the nyquist frequency...
+    f_c = 0.5;
+  }
   var wct = Math.sqrt(2) * Math.PI * f_c;
   var e = Math.exp(-wct);
   var c = e * Math.cos(wct);
