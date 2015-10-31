@@ -221,7 +221,6 @@ function next_row() {
   for (var i = 0; i < r.length; i++) {
     var ch = channelinfo[i];
     var inst = ch.inst;
-    ch.update = false;
     var triggernote = false;
     // instrument trigger
     if (r[i][1] != -1) {
@@ -243,8 +242,6 @@ function next_row() {
         ch.release = 1;
         triggernote = false;
       } else {
-        // assume linear frequency table (flags header & 1 == 1)
-        // is this true in kamel.xm?
         if (inst != undefined) {
           var note = r[i][0] + inst.note;
           ch.note = note;
@@ -262,11 +259,11 @@ function next_row() {
       } else if (v <= 0x50) {
         ch.vol = v - 0x10;
       } else if (v >= 0x60 && v < 0x70) {  // volume slide down
-        ch.voleffectfn = function() {
+        ch.voleffectfn = function(ch) {
           ch.vol = Math.max(0, ch.vol - ch.voleffectdata);
         }
       } else if (v >= 0x70 && v < 0x80) {  // volume slide up
-        ch.voleffectfn = function() {
+        ch.voleffectfn = function(ch) {
           ch.vol = Math.min(64, ch.vol + ch.voleffectdata);
         }
       } else if (v >= 0x80 && v < 0x90) {  // fine volume slide down
@@ -462,7 +459,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   if (volR == 0 && volL == 0)
     return;
   if (isNaN(volR) || isNaN(volL)) {
-    console.log("NaN volume!?", volL, volR, volE, panE, ch.vol);
+    console.log("NaN volume!?", ch.number, volL, volR, volE, panE, ch.vol);
     return;
   }
   var k = ch.off;
@@ -931,6 +928,7 @@ function playXM(arrayBuf) {
   document.getElementById('vu').width = 16 * nchan;
   for (var i = 0; i < nchan; i++) {
     channelinfo.push({
+      number: i,
       filterstate: new Float32Array(3),
       vol: 0,
       pan: 128,
