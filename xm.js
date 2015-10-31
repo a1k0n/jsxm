@@ -52,7 +52,9 @@ function RenderPattern(canv, pattern) {
       // render instrument
       var inst = data[1];
       if (inst != -1) {  // no instrument = render nothing
-        ctx.drawImage(fontimg, 8*(inst>>4), 4*8, 4, 8, dx, dy, 4, 8);
+        if (inst > 15) {
+          ctx.drawImage(fontimg, 8*(inst>>4), 4*8, 4, 8, dx, dy, 4, 8);
+        }
         ctx.drawImage(fontimg, 8*(inst&15), 4*8, 4, 8, dx+4, dy, 4, 8);
       }
       dx += 12;
@@ -1136,6 +1138,17 @@ function playXM(arrayBuf) {
   debug.innerHTML = songname;
   var gfxpattern = document.getElementById("gfxpattern");
   gfxpattern.width = _pattern_cellwidth * nchan + _pattern_border;
+
+  var instrlist = document.getElementById("instruments");
+  var list = [];
+  for (var i = 0; i < ninst; i++) {
+    var inst = instruments[i];
+    if (inst == null) continue;
+    var n = (i+1).toString(16);
+    if (i < 15) n = ' ' + n;
+    list.push(n + " " + inst.name);
+  }
+  instrlist.innerHTML = list.join("\n");
 
   // start playing
   gainNode.connect(audioctx.destination);
