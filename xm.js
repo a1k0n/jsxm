@@ -15,6 +15,7 @@ audioContext = window.AudioContext || window.webkitAudioContext;
 
 var _fontmap_notes = [8*5, 8*22, 8*28];
 var _pattern_cellwidth = 16 + 4 + 8 + 4 + 8 + 16 + 4;
+var _scope_width = _pattern_cellwidth - 1;
 var _pattern_border = 20;
 var pat_canvas_patnum;
 function RenderPattern(canv, pattern) {
@@ -166,16 +167,36 @@ function RedrawScreen() {
   } while(e.t < t && audio_events.length > 0);
   if (e == undefined) return;
   var VU = e.vu;
+  var scopes = e.scopes;
 
-  // update VU meters
-  var canvas = document.getElementById("vu");
-  var ctx = canvas.getContext("2d");
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, 16 * nchan, 64);
-  ctx.fillStyle = '#0f0';
-  for (var j = 0; j < nchan; j++) {
-    var y = -Math.log(VU[j])*10;
-    ctx.fillRect(j*16, y, 15, 64-y);
+  if (e.scopes != undefined) {
+    // update VU meters & oscilliscopes
+    var canvas = document.getElementById("vu");
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, 64);
+    ctx.fillStyle = '#0f0';
+    ctx.strokeStyle = '#55acff';
+    for (var j = 0; j < nchan; j++) {
+      var x = _pattern_border + j * _pattern_cellwidth;
+      // render channel number
+      if (j >= 10) {
+        ctx.drawImage(fontimg, 8*((j/10)|0), 4*8, 4, 8, x, 1, 4, 8);
+      }
+      ctx.drawImage(fontimg, 8*(j%10), 4*8, 4, 8, x+4, 1, 4, 8);
+
+      // volume in dB as a green bar
+      var vu_y = -Math.log(VU[j])*10;
+      ctx.fillRect(x, vu_y, 2, 64-vu_y);
+
+      // oscilloscope
+      var scope = scopes[j];
+      ctx.beginPath();
+      for (var k = 0; k < _scope_width; k++) {
+        ctx.lineTo(x + 1 + k, 32 - 16 * scope[k]);
+      }
+      ctx.stroke();
+    }
   }
 
   var debug = document.getElementById("debug");
@@ -616,14 +637,32 @@ function audio_cb(e) {
     }
     var tickduration = Math.min(buflen, ticklen - cur_ticksamp);
     var VU = new Float32Array(nchan);
+    var scopes = undefined;
     for (var j = 0; j < nchan; j++) {
+      var scope;
+      if (tickduration >= _scope_width) {
+        scope = new Float32Array(_scope_width);
+        for (var k = 0; k < _scope_width; k++) {
+          scope[k] = -dataL[offset+k] - dataR[offset+k];
+        }
+      }
+
       VU[j] = MixChannelIntoBuf(
           channelinfo[j], offset, offset + tickduration, dataL, dataR) /
         tickduration;
+
+      if (tickduration >= _scope_width) {
+        for (var k = 0; k < _scope_width; k++) {
+          scope[k] += dataL[offset+k] + dataR[offset+k];
+        }
+        if (scopes == undefined) scopes = [];
+        scopes.push(scope);
+      }
     }
     audio_events.push({
       t: e.playbackTime + (0.0 + offset) / f_smp,
       vu: VU,
+      scopes: scopes,
       songpos: cur_songpos,
       pat: cur_pat,
       row: cur_row - 1
@@ -707,7 +746,7 @@ function playXM(arrayBuf) {
   var flags = dv.getUint16(0x4a, true);
   tempo = dv.getUint16(0x4c, true);
   bpm = dv.getUint16(0x4e, true);
-  document.getElementById('vu').width = 16 * nchan;
+  document.getElementById('vu').width = _pattern_border + _pattern_cellwidth * nchan;
   for (var i = 0; i < nchan; i++) {
     channelinfo.push({
       number: i,

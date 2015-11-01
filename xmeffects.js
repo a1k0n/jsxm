@@ -207,7 +207,7 @@ function eff_t1_r(ch) {
 
 function eff_unimplemented() {}
 function eff_unimplemented_t0(ch, data) {
-  console.log("unimplemented effect", ch.effect.toString(16), data.toString(16));
+  console.log("unimplemented effect", prettify_effect(ch.effect, data));
 }
 
 var effects_t0 = [  // effect functions on tick 0
