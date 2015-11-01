@@ -281,13 +281,14 @@ function next_row() {
 
     ch.effect = r[i][3];
     ch.effectdata = r[i][4];
-    if (ch.effect < 16) {
+    if (ch.effect < 36) {
       ch.effectfn = effects_t1[ch.effect];
-      if (effects_t0[ch.effect](ch, ch.effectdata)) {
+      var eff_t0 = effects_t0[ch.effect];
+      if (eff_t0 && eff_t0(ch, ch.effectdata)) {
         triggernote = false;
       }
     } else {
-      console.log("channel", i, "effect > 16", ch.effect);
+      console.log("channel", i, "effect > 36", ch.effect);
     }
 
     // special handling for portamentos: don't trigger the note
@@ -636,227 +637,6 @@ function audio_cb(e) {
   }
 }
 
-function eff_t0_1(ch, data) {  // pitch slide up
-  if (data != 0) {
-    ch.slideupspeed = data;
-  }
-}
-
-function eff_t0_2(ch, data) {  // pitch slide down
-  if (data != 0) {
-    ch.slidedownspeed = data;
-  }
-}
-
-function eff_t0_3(ch, data) {  // portamento
-  if (data != 0) {
-    ch.portaspeed = data;
-  }
-}
-
-function eff_t0_4(ch, data) {  // vibrato
-  if (data & 0x0f) {
-    ch.vibratodepth = data & 0x0f;
-  }
-  if (data >> 4) {
-    ch.vibratospeed = data >> 4;
-  }
-  eff_t1_4(ch, data);
-}
-
-function eff_t0_8(ch, data) {  // set panning
-  ch.pan = data;
-}
-
-function eff_t0_9(ch, data) {  // sample offset
-  ch.off = data * 256;
-}
-
-function eff_t0_a(ch, data) {  // volume slide
-  if (data) {
-    if (data & 0x0f) {
-      ch.volumeslide = -(data & 0x0f);
-    } else {
-      ch.volumeslide = data >> 4;
-    }
-  }
-}
-
-function eff_t0_b(ch, data) {  // song jump (untested)
-  if (data < songpats.length) {
-    cur_songpos = data
-    cur_pat = songpats[cur_songpos];
-  }
-}
-
-function eff_t0_c(ch, data) {  // set volume
-  ch.vol = Math.min(64, data);
-}
-
-function eff_t0_d(ch, data) {  // pattern jump
-  cur_songpos++;
-  if (cur_songpos >= songpats.length)
-    cur_songpos = song_looppos;
-  cur_pat = songpats[cur_songpos];
-  cur_row = data;
-}
-
-function eff_t0_e(ch, data) {  // extended effects!
-  var eff = data >> 4;
-  data = data & 0x0f;
-  switch (eff) {
-    case 1:  // fine porta up
-      ch.period -= data;
-      break;
-    case 2:  // fine porta down
-      ch.period += data;
-      break;
-    case 8:  // panning
-      ch.pan = data * 0x11;
-      break;
-    case 0x0a:  // fine vol slide up (with memory)
-      if (data == 0 && ch.finevolup != undefined)
-        data = ch.finevolup;
-      ch.vol = Math.min(64, ch.vol + data);
-      ch.finevolup = data;
-      break;
-    case 0x0b:  // fine vol slide down
-      if (data == 0 && ch.finevoldown != undefined)
-        data = ch.finevoldown;
-      ch.vol = Math.max(0, ch.vol - data);
-      ch.finevoldown = data;
-      break;
-    case 0x0c:  // note cut handled in eff_t1_e
-      break;
-    default:
-      console.log("unimplemented extended effect E", ch.effect.toString(16));
-      break;
-  }
-}
-
-function eff_t0_f(ch, data) {  // set tempo
-  if (data == 0) {
-    console.log("tempo 0?");
-    return;
-  } else if(data < 0x20) {
-    tempo = data;
-  } else {
-    bpm = data;
-  }
-}
-
-function eff_unimplemented_t0(ch, data) {
-  console.log("unimplemented effect", ch.effect.toString(16), data.toString(16));
-}
-
-var effects_t0 = [  // effect functions on tick 0
-  eff_t1_0,  // 1, arpeggio is processed on all ticks
-  eff_t0_1,
-  eff_t0_2,
-  eff_t0_3,
-  eff_t0_4,  // 4
-  eff_t0_a,  // 5, same as A on first tick
-  eff_t0_a,  // 6, same as A on first tick
-  eff_unimplemented_t0,  // 7
-  eff_t0_8,  // 8
-  eff_t0_9,  // 9
-  eff_t0_a,  // a
-  eff_t0_b,  // b
-  eff_t0_c,  // c
-  eff_t0_d,  // d
-  eff_t0_e,  // e
-  eff_t0_f,  // f
-];
-
-function eff_t1_0(ch) {  // arpeggio
-  if (ch.effectdata != 0 && ch.inst != undefined) {
-    var arpeggio = [0, ch.effectdata>>4, ch.effectdata&15];
-    var note = ch.note + arpeggio[cur_tick % 3];
-    ch.period = PeriodForNote(ch, note);
-  }
-}
-
-function eff_t1_1(ch) {  // pitch slide up
-  if (ch.slideupspeed !== undefined) {
-    // is this limited? it appears not
-    ch.period -= ch.slideupspeed;
-  }
-}
-
-function eff_t1_2(ch) {  // pitch slide down
-  if (ch.slidedownspeed !== undefined) {
-    // 1728 is the period for C-1
-    ch.period = Math.min(1728, ch.period + ch.slidedownspeed);
-  }
-}
-
-function eff_t1_3(ch) {  // portamento
-  if (ch.periodtarget !== undefined && ch.portaspeed !== undefined) {
-    if (ch.period > ch.periodtarget) {
-      ch.period = Math.max(ch.periodtarget, ch.period - ch.portaspeed);
-    } else {
-      ch.period = Math.min(ch.periodtarget, ch.period + ch.portaspeed);
-    }
-  }
-}
-
-function eff_t1_4(ch) {  // vibrato
-  ch.periodoffset = Math.sin(ch.vibratopos * Math.PI / 32) * ch.vibratodepth;
-  if (isNaN(ch.periodoffset)) {
-    console.log("vibrato periodoffset NaN?", ch.vibratopos, ch.vibratodepth);
-    ch.periodoffset = 0;
-  }
-  ch.vibratopos += ch.vibratospeed;
-  ch.vibratopos &= 63;
-}
-
-function eff_t1_5(ch) {  // portamento + volume slide
-  eff_t1_a(ch);
-  eff_t1_3(ch);
-}
-
-function eff_t1_6(ch) {  // vibrato + volume slide
-  eff_t1_a(ch);
-  eff_t1_4(ch);
-}
-
-function eff_t1_a(ch) {  // volume slide
-  if (ch.volumeslide !== undefined) {
-    ch.vol = Math.max(0, Math.min(64, ch.vol + ch.volumeslide));
-  }
-}
-
-function eff_t1_e(ch) {  // note cut
-  switch (ch.effectdata >> 4) {
-    case 0x0c:
-      if (cur_tick == (ch.effectdata & 0x0f)) {
-        ch.vol = 0;
-      }
-      break;
-  }
-}
-
-function eff_nop() {}
-function eff_unimplemented() {}
-var effects_t1 = [  // effect functions on tick 1+
-  eff_t1_0,
-  eff_t1_1,
-  eff_t1_2,
-  eff_t1_3,
-  eff_t1_4,
-  eff_t1_5,  // 5
-  eff_t1_6,  // 6
-  eff_unimplemented,  // 7
-  eff_nop,   // 8
-  eff_nop,   // 9
-  eff_t1_a,  // a
-  eff_nop,   // b
-  eff_nop,   // c
-  eff_nop,   // d
-  eff_t1_e,  // e
-  eff_nop,   // f
-];
-
 function ConvertSample(array, bits) {
   var len = array.length;
   var acc = 0;
@@ -939,6 +719,7 @@ function playXM(arrayBuf) {
       vLprev: 0, vRprev: 0,
       mute: 0,
       volE: 0, panE: 0,
+      retrig: 0,
       vibratodepth: 1,
       vibratospeed: 1,
     })
