@@ -154,7 +154,7 @@ function UpdateChannelPeriod(ch, period) {
 }
 
 function PeriodForNote(ch, note) {
-  return 1920 - note*16 - ch.inst.fine / 8.0;
+  return 1920 - (note + ch.samp.note)*16 - ch.samp.fine / 8.0;
 }
 
 var audio_events = [];
@@ -252,8 +252,10 @@ function next_row() {
         ch.inst = inst;
         // retrigger unless overridden below
         triggernote = true;
-        ch.pan = inst.pan;
-        ch.vol = inst.vol;
+        if (ch.samp) {
+          ch.vol = ch.samp.vol;
+          ch.pan = ch.samp.pan;
+        }
       } else {
         // console.log("invalid inst", r[i][1], instruments.length);
       }
@@ -266,9 +268,12 @@ function next_row() {
         triggernote = false;
       } else {
         if (inst != undefined) {
-          var note = r[i][0] + inst.note;
+          var note = r[i][0];
           ch.note = note;
           triggernote = true;
+          ch.samp = inst.samples[inst.samplemap[ch.note]];
+          ch.pan = ch.samp.pan;
+          ch.vol = ch.samp.vol;
         }
       }
     }
@@ -455,7 +460,7 @@ function MixSilenceIntoBuf(ch, start, end, dataL, dataR) {
 
 function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   var inst = ch.inst;
-  var samp, sample_end;
+  var instsamp = ch.samp;
   var loop = false;
   var looplen = 0, loopstart = 0;
 
@@ -464,15 +469,15 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
     return MixSilenceIntoBuf(ch, start, end, dataL, dataR);
   }
 
-  samp = inst.sampledata;
-  sample_end = inst.len;
-  if ((inst.type & 3) == 1) { // todo: support pingpong
+  var samp = instsamp.sampledata;
+  var sample_end = instsamp.len;
+  if ((instsamp.type & 3) == 1) { // todo: support pingpong
     loop = true;
-    loopstart = inst.loop;
-    looplen = inst.looplen;
+    loopstart = instsamp.loop;
+    looplen = instsamp.looplen;
     sample_end = loopstart + looplen;
   }
-  var samplen = inst.len;
+  var samplen = instsamp.len;
   var volE = ch.volE / 64.0;    // current volume envelope
   var panE = 4*(ch.panE - 32);  // current panning envelope
   var p = panE + ch.pan - 128;  // final pan
@@ -703,33 +708,34 @@ function ConvertSample(array, bits) {
 
 // optimization: unroll short sample loops so we can run our inner mixing loop
 // uninterrupted for as long as possible; this also handles pingpong loops.
-function UnrollSampleLoop(inst) {
-  var nloops = ((2048 + inst.looplen - 1) / inst.looplen) | 0;
-  var pingpong = inst.type & 2;
+function UnrollSampleLoop(samp) {
+  var nloops = ((2048 + samp.looplen - 1) / samp.looplen) | 0;
+  console.log(samp.looplen, nloops);
+  var pingpong = samp.type & 2;
   if (pingpong) {
     // make sure we have an even number of loops if we are pingponging
     nloops = (nloops + 1) & (~1);
   }
-  var samplesiz = inst.loop + nloops * inst.looplen;
-  var samp = new Float32Array(samplesiz);
-  for (var i = 0; i < inst.loop; i++) {
-    samp[i] = inst.sampledata[i];
+  var samplesiz = samp.loop + nloops * samp.looplen;
+  var data = new Float32Array(samplesiz);
+  for (var i = 0; i < samp.loop; i++) {
+    data[i] = samp.sampledata[i];
   }
   for (var j = 0; j < nloops; j++) {
     if ((j&1) && pingpong) {
-      for (var k = inst.looplen - 1; k >= 0; k--) {
-        samp[i++] = inst.sampledata[inst.loop + k];
+      for (var k = samp.looplen - 1; k >= 0; k--) {
+        data[i++] = samp.sampledata[samp.loop + k];
       }
     } else {
-      for (var k = 0; k < inst.looplen; k++) {
-        samp[i++] = inst.sampledata[inst.loop + k];
+      for (var k = 0; k < samp.looplen; k++) {
+        data[i++] = samp.sampledata[samp.loop + k];
       }
     }
   }
-  console.log("unrolled sample loop", inst.number, "looplen", inst.looplen, "x", nloops, " = ", samplesiz);
-  inst.sampledata = samp;
-  inst.looplen = nloops * inst.looplen;
-  inst.type = 1;
+  console.log("unrolled sample loop; looplen", samp.looplen, "x", nloops, " = ", samplesiz);
+  samp.sampledata = data;
+  samp.looplen = nloops * samp.looplen;
+  samp.type = 1;
 }
 
 function playXM(arrayBuf) {
@@ -829,6 +835,10 @@ function playXM(arrayBuf) {
     var instname = getstring(dv, idx+0x4, 22);
     var nsamp = dv.getUint16(idx+0x1b, true);
     if (nsamp > 0) {
+      // return a slice so we have a fresh copy and don't retain pointers to
+      // the original xm file arraybuf forever
+      var samplemap = new Uint8Array(arrayBuf, idx+33, 96).slice();
+
       var env_nvol = dv.getUint8(idx+225);
       var env_vol_type = dv.getUint8(idx+233);
       var env_vol_sustain = dv.getUint8(idx+227);
@@ -855,29 +865,48 @@ function playXM(arrayBuf) {
           hdrsiz, i, instname, nsamp, samphdrsiz);
       idx += hdrsiz;
       var totalsamples = 0;
+      var samps = [];
       for (var j = 0; j < nsamp; j++) {
         var samplen = dv.getUint32(idx, true);
-        if (j == 0) {
-          var samplen0 = samplen;  // FIXME HACK HACK HACK
-          var samploop = dv.getUint32(idx+4, true);
-          var samplooplen = dv.getUint32(idx+8, true);
-          var sampvol = dv.getUint8(idx+12);
-          var sampfinetune = dv.getInt8(idx+13);
-          var samptype = dv.getUint8(idx+14);
-          var samppan = dv.getUint8(idx+15);
-          var sampnote = dv.getInt8(idx+16);
-          var sampname = getstring(dv, idx+18, 22);
-          var sampleoffset = idx + samphdrsiz;
-          console.log("sample %d: len %d name '%s' loop %d/%d vol %d",
-              j, samplen, sampname, samploop, samplooplen, sampvol);
-          console.log("           type %d note %s(%d) finetune %d pan %d",
-              samptype, prettify_note(sampnote + 12*4), sampnote, sampfinetune, samppan);
-          console.log("           vol env", env_vol, env_vol_sustain,
-              env_vol_loop_start, env_vol_loop_end, "type", env_vol_type,
-              "fadeout", vol_fadeout);
-          console.log("           pan env", env_pan, env_pan_sustain,
-              env_pan_loop_start, env_pan_loop_end, "type", env_pan_type);
+        var samploop = dv.getUint32(idx+4, true);
+        var samplooplen = dv.getUint32(idx+8, true);
+        var sampvol = dv.getUint8(idx+12);
+        var sampfinetune = dv.getInt8(idx+13);
+        var samptype = dv.getUint8(idx+14);
+        var samppan = dv.getUint8(idx+15);
+        var sampnote = dv.getInt8(idx+16);
+        var sampname = getstring(dv, idx+18, 22);
+        var sampleoffset = idx + samphdrsiz + totalsamples;
+        console.log("sample %d: len %d name '%s' loop %d/%d vol %d",
+            j, samplen, sampname, samploop, samplooplen, sampvol);
+        console.log("           type %d note %s(%d) finetune %d pan %d",
+            samptype, prettify_note(sampnote + 12*4), sampnote, sampfinetune, samppan);
+        console.log("           vol env", env_vol, env_vol_sustain,
+            env_vol_loop_start, env_vol_loop_end, "type", env_vol_type,
+            "fadeout", vol_fadeout);
+        console.log("           pan env", env_pan, env_pan_sustain,
+            env_pan_loop_start, env_pan_loop_end, "type", env_pan_type);
+        var samp = {
+          'len': samplen, 'loop': samploop,
+          'looplen': samplooplen, 'note': sampnote, 'fine': sampfinetune,
+          'pan': samppan, 'type': samptype, 'vol': sampvol,
+          'fine': sampfinetune,
+          'sampledata': ConvertSample(
+              new Uint8Array(arrayBuf, sampleoffset, samplen), samptype & 16),
+        };
+        // length / pointers are all specified in bytes; fixup for 16-bit samples
+        if (samptype & 16) {
+          samp.len /= 2;
+          samp.loop /= 2;
+          samp.looplen /= 2;
         }
+
+        // unroll short loops and any pingpong loops
+        if ((samp.type & 3) && (samp.looplen < 2048 || (samp.type & 2))) {
+          UnrollSampleLoop(samp);
+        }
+        samps.push(samp);
+
         idx += samphdrsiz;
         totalsamples += samplen;
       }
@@ -885,24 +914,10 @@ function playXM(arrayBuf) {
       inst = {
         'name': instname,
         'number': i,
-        'len': samplen0, 'loop': samploop,
-        'looplen': samplooplen, 'note': sampnote, 'fine': sampfinetune,
-        'pan': samppan, 'type': samptype, 'vol': sampvol,
-        'fine': sampfinetune,
         'fadeout': vol_fadeout,
-        'sampledata': ConvertSample(new Uint8Array(arrayBuf, sampleoffset, samplen0), samptype & 16),
+        'samplemap': samplemap,
+        'samples': samps,
       };
-      if (samptype & 16) {
-        inst.len /= 2;
-        inst.loop /= 2;
-        inst.looplen /= 2;
-      }
-
-      // unroll short loops and any pingpong loops
-      if ((inst.type & 3) && (inst.looplen < 2048 || (inst.type & 2))) {
-        UnrollSampleLoop(inst);
-      }
-
       if (env_vol_type) {
         // insert an automatic fadeout to 0 at the end of the envelope
         var env_end_tick = env_vol[env_vol.length-2];
