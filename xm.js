@@ -640,10 +640,10 @@ function audio_cb(e) {
     var scopes = undefined;
     for (var j = 0; j < nchan; j++) {
       var scope;
-      if (tickduration >= _scope_width) {
+      if (tickduration >= 4*_scope_width) {
         scope = new Float32Array(_scope_width);
         for (var k = 0; k < _scope_width; k++) {
-          scope[k] = -dataL[offset+k] - dataR[offset+k];
+          scope[k] = -dataL[offset+k*4] - dataR[offset+k*4];
         }
       }
 
@@ -651,9 +651,9 @@ function audio_cb(e) {
           channelinfo[j], offset, offset + tickduration, dataL, dataR) /
         tickduration;
 
-      if (tickduration >= _scope_width) {
+      if (tickduration >= 4*_scope_width) {
         for (var k = 0; k < _scope_width; k++) {
-          scope[k] += dataL[offset+k] + dataR[offset+k];
+          scope[k] += dataL[offset+k*4] + dataR[offset+k*4];
         }
         if (scopes == undefined) scopes = [];
         scopes.push(scope);
