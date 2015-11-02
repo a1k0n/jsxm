@@ -822,6 +822,7 @@ function playXM(arrayBuf) {
     patterns.push(pattern);
   }
 
+  var namelist = [];
   // now load instruments
   for (i = 0; i < ninst; i++) {
     var hdrsiz = dv.getUint32(idx, true);
@@ -944,6 +945,10 @@ function playXM(arrayBuf) {
       console.log("empty instrument", i, hdrsiz, idx);
       instruments.push(null);
     }
+
+    var n = (i+1).toString(16);
+    if (i < 15) n = ' ' + n;
+    namelist.push(n + " " + instname);
   }
 
   audioctx = new audioContext();
@@ -960,15 +965,7 @@ function playXM(arrayBuf) {
   gfxpattern.width = _pattern_cellwidth * nchan + _pattern_border;
 
   var instrlist = document.getElementById("instruments");
-  var list = [];
-  for (var i = 0; i < ninst; i++) {
-    var inst = instruments[i];
-    if (inst == null) continue;
-    var n = (i+1).toString(16);
-    if (i < 15) n = ' ' + n;
-    list.push(n + " " + inst.name);
-  }
-  instrlist.innerHTML = list.join("\n");
+  instrlist.innerHTML = namelist.join("\n");
 
   // start playing
   gainNode.connect(audioctx.destination);
