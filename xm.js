@@ -465,7 +465,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   var looplen = 0, loopstart = 0;
 
   // nothing on this channel, just filter the last dc offset back down to zero
-  if (inst == undefined || ch.mute) {
+  if (instsamp == undefined || inst == undefined || ch.mute) {
     return MixSilenceIntoBuf(ch, start, end, dataL, dataR);
   }
 
