@@ -251,7 +251,8 @@ function next_row() {
         ch.inst = inst;
         // retrigger unless overridden below
         triggernote = true;
-        if (ch.samp) {
+        if (ch.note) {
+          ch.samp = inst.samples[inst.samplemap[ch.note]];
           ch.vol = ch.samp.vol;
           ch.pan = ch.samp.pan;
         }
