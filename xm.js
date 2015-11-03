@@ -244,11 +244,11 @@ function next_row() {
     // instrument trigger
     if (r[i][1] != -1) {
       inst = xm.instruments[r[i][1] - 1];
-      if (inst != undefined) {
+      if (inst && inst.samplemap) {
         ch.inst = inst;
         // retrigger unless overridden below
         triggernote = true;
-        if (ch.note) {
+        if (ch.note && inst.samplemap) {
           ch.samp = inst.samples[inst.samplemap[ch.note]];
           ch.vol = ch.samp.vol;
           ch.pan = ch.samp.pan;
@@ -264,7 +264,7 @@ function next_row() {
         ch.release = 1;
         triggernote = false;
       } else {
-        if (inst != undefined) {
+        if (inst && inst.samplemap) {
           var note = r[i][0];
           ch.note = note;
           ch.samp = inst.samples[inst.samplemap[ch.note]];
@@ -324,7 +324,7 @@ function next_row() {
         ch.periodtarget = PeriodForNote(ch, ch.note);
       }
       triggernote = false;
-      if (inst != undefined) {
+      if (inst && inst.samplemap) {
         if (ch.env_vol == undefined) {
           // note wasn't already playing; we basically have to ignore the
           // portamento and just trigger
