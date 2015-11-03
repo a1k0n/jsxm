@@ -65,8 +65,7 @@ function RenderPattern(canv, pattern) {
       if (vol < 0x10) {
         ctx.drawImage(fontimg, 312, 0, 8, 8, dx, dy, 8, 8);
       } else {
-        vol -= 0x10;
-        ctx.drawImage(fontimg, 8*(vol>>4), 4*8, 4, 8, dx, dy, 4, 8);
+        ctx.drawImage(fontimg, 8*(vol>>4) + 56*8, 4*8, 8, 8, dx, dy, 8, 8);
         ctx.drawImage(fontimg, 8*(vol&15), 4*8, 4, 8, dx+4, dy, 4, 8);
       }
       dx += 8;
