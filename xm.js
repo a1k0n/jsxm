@@ -135,7 +135,7 @@ function FilterCoeffs(f_c) {
   var e = Math.exp(-wct);
   var c = e * Math.cos(wct);
   var s = e * Math.sin(wct);
-  var gain = (1 - 2*c + c*c + s*s) / 2;
+  var gain = (1 - 2*c + c*c + s*s);
   return [gain, 2*c, -c*c - s*s];
 }
 
@@ -481,7 +481,6 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
     looplen = instsamp.looplen;
     sample_end = loopstart + looplen;
   }
-  var samplen = instsamp.len;
   var volE = ch.volE / 64.0;    // current volume envelope
   var panE = 4*(ch.panE - 32);  // current panning envelope
   var p = panE + ch.pan - 128;  // final pan
@@ -530,6 +529,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
     var next_event = Math.max(1, Math.min(end, i + (sample_end - k) / dk));
     // this is the inner loop of the player
 
+    /*
     // unrolled 8x
     for (; i + 7 < next_event; i+=8) {
       var s = samp[k|0];
@@ -599,20 +599,25 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
       vL = pf_8 * vL + (1 - pf_8) * volL;
       vR = pf_8 * vR + (1 - pf_8) * volR;
     }
+    */
 
     for (; i < next_event; i++) {
-      var s = samp[k|0];
+      var s0 = samp[k|0];
+      var s1 = samp[1+k|0];
+      var t = k - (k|0);
       // we low-pass filter here since we are resampling some arbitrary
       // frequency to f_smp; this is an anti-aliasing filter and is
       // implemented as an IIR butterworth filter (usually we'd use an FIR
       // brick wall filter, but this is much simpler computationally and
       // sounds fine)
-      var y = f0 * (s + fs0) + f1*fs1 + f2*fs2;
-      fs2 = fs1; fs1 = y; fs0 = s;
+      var y = f0 * (t*s1 + (1-t) * s0) + f1*fs1 + f2*fs2;
+      fs2 = fs1; fs1 = y;
       dataL[i] += vL * y;
       dataR[i] += vR * y;
       Vrms += (vL + vR) * y * y;
       k += dk;
+      vL = popfilter_alpha * vL + (1 - popfilter_alpha) * volL;
+      vR = popfilter_alpha * vR + (1 - popfilter_alpha) * volR;
     }
   }
   ch.off = k;
@@ -688,26 +693,25 @@ function audio_cb(e) {
 function ConvertSample(array, bits) {
   var len = array.length;
   var acc = 0;
+  var samp = new Float32Array(len+1);
   if (bits == 0) {  // 8 bit sample
-    var samp = new Float32Array(len);
     for (var k = 0; k < len; k++) {
       acc += array[k];
       var b = acc&255;
       if (b & 128) b = b-256;
       samp[k] = b / 128.0;
     }
-    return samp;
   } else {
     len /= 2;
-    var samp = new Float32Array(len);
     for (var k = 0; k < len; k++) {
       acc += array[k*2] + (array[k*2 + 1] << 8);
       var b = acc&65535;
       if (b & 32768) b = b-65536;
       samp[k] = b / 32768.0;
     }
-    return samp;
   }
+  samp[len] = samp[len-1];
+  return samp;
 }
 
 // optimization: unroll short sample loops so we can run our inner mixing loop
@@ -721,7 +725,7 @@ function UnrollSampleLoop(samp) {
     nloops = (nloops + 1) & (~1);
   }
   var samplesiz = samp.loop + nloops * samp.looplen;
-  var data = new Float32Array(samplesiz);
+  var data = new Float32Array(samplesiz + 1);
   for (var i = 0; i < samp.loop; i++) {
     data[i] = samp.sampledata[i];
   }
@@ -896,7 +900,8 @@ function playXM(arrayBuf) {
           'pan': samppan, 'type': samptype, 'vol': sampvol,
           'fine': sampfinetune,
           'sampledata': ConvertSample(
-              new Uint8Array(arrayBuf, sampleoffset, samplen), samptype & 16),
+              new Uint8Array(arrayBuf, sampleoffset, samplen),
+              samptype & 16),
         };
         // length / pointers are all specified in bytes; fixup for 16-bit samples
         if (samptype & 16) {
@@ -906,8 +911,13 @@ function playXM(arrayBuf) {
         }
 
         // unroll short loops and any pingpong loops
-        if ((samp.type & 3) && (samp.looplen < 2048 || (samp.type & 2))) {
-          UnrollSampleLoop(samp);
+        if (samp.type & 3) {
+          if ((samp.looplen < 2048 || (samp.type & 2))) {
+            UnrollSampleLoop(samp);
+          }
+          // overwrite loop boundary sample (we always have at least one
+          // extra sample for interpolation)
+          samp.sampledata[samp.loop + samp.looplen] = samp.sampledata[samp.loop];
         }
         samps.push(samp);
 
