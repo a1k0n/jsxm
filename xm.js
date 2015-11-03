@@ -270,10 +270,14 @@ function next_row() {
         if (inst != undefined) {
           var note = r[i][0];
           ch.note = note;
-          triggernote = true;
           ch.samp = inst.samples[inst.samplemap[ch.note]];
-          ch.pan = ch.samp.pan;
-          ch.vol = ch.samp.vol;
+          if (triggernote) {
+            // if we were already triggering the note, reset vol/pan using
+            // (potentially) new sample
+            ch.pan = ch.samp.pan;
+            ch.vol = ch.samp.vol;
+          }
+          triggernote = true;
         }
       }
     }
