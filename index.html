@@ -3,7 +3,8 @@
   <script src="xm.js"></script>
   <script src="xmeffects.js"></script>
 </head>
-<body>
+<body onload="main()">
+  <div><button id='playpause' disabled=true style="width: 100px">Play</button></div>
   <div><canvas id='vu' width=224 height=64></canvas></div>
   <div><canvas id='gfxpattern' width=640 height=200></canvas></div>
 <pre id='debug'>
@@ -14,9 +15,7 @@
 code: <a href="http://github.com/a1k0n/jsxm/">github.com/a1k0n/jsxm</a>
 todo:
  - file picker, upload more xms to a host we can access cross-origin
- - make display even more faithfully FT2-like
  - render instrument list in ft2 font
- - oscilloscope trigger on zero crossing or something
  - missing XM effects:
    - E3x, E4x, E5x, E6x, E7x, E9x, EDx, EEx
    - 7xy - tremolo
