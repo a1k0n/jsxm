@@ -103,9 +103,9 @@ function eff_t1_a(ch) {  // volume slide
 }
 
 function eff_t0_b(ch, data) {  // song jump (untested)
-  if (data < songpats.length) {
+  if (data < xm.songpats.length) {
     cur_songpos = data
-    cur_pat = songpats[cur_songpos];
+    cur_pat = xm.songpats[cur_songpos];
   }
 }
 
@@ -115,9 +115,9 @@ function eff_t0_c(ch, data) {  // set volume
 
 function eff_t0_d(ch, data) {  // pattern jump
   cur_songpos++;
-  if (cur_songpos >= songpats.length)
-    cur_songpos = song_looppos;
-  cur_pat = songpats[cur_songpos];
+  if (cur_songpos >= xm.songpats.length)
+    cur_songpos = xm.song_looppos;
+  cur_pat = xm.songpats[cur_songpos];
   cur_row = data;
 }
 
