@@ -794,7 +794,7 @@ function UnrollSampleLoop(samp) {
   samp.type = 1;
 }
 
-function loadXM(arrayBuf) {
+function LoadXM(arrayBuf) {
   var dv = new DataView(arrayBuf);
   var xm = {};
 
@@ -1026,6 +1026,10 @@ function loadXM(arrayBuf) {
   DrawBigText(xm.songname, 0, 1, ctx);
 
   var instrlist = document.getElementById("instruments");
+  // clear instrument list if not already clear
+  while (instrlist.childNodes.length) {
+    instrlist.removeChild(instrlist.childNodes[0]);
+  }
   var instrcols = ((xm.instruments.length + 7) / 8) | 0;
   for (var i = 0; i < instrcols; i++) {
     var canvas = document.createElement('canvas');
@@ -1074,10 +1078,12 @@ var playing = false;
 var jsNode, gainNode;
 var paused_events = [];
 function InitAudio() {
-  audioContext = window.AudioContext || window.webkitAudioContext;
-  audioctx = new audioContext();
-  gainNode = audioctx.createGain();
-  gainNode.gain.value = 0.1;  // master volume
+  if (audioctx == undefined) {
+    audioContext = window.AudioContext || window.webkitAudioContext;
+    audioctx = new audioContext();
+    gainNode = audioctx.createGain();
+    gainNode.gain.value = 0.1;  // master volume
+  }
   jsNode = audioctx.createScriptProcessor(16384, 0, 2);
   jsNode.onaudioprocess = audio_cb;
   gainNode.connect(audioctx.destination);
@@ -1113,19 +1119,25 @@ function PauseXM() {
   playing = false;
 }
 
-function main() {
-  InitAudio();
-  var xmReq = new XMLHttpRequest();
-  var uri = location.search.substr(1);
-  if (uri == "") {
-    uri = "kamel.xm";
+function StopXM() {
+  if (playing) {
+    jsNode.disconnect(gainNode);
+    playing = false;
+    audio_events = [];
+    paused_events = [];
   }
+  cur_songpos = -1, cur_pat = -1, cur_row = 64, cur_ticksamp = 0;
+  InitAudio();
+}
+
+function DownloadXM(uri) {
+  var xmReq = new XMLHttpRequest();
   xmReq.open("GET", uri, true);
   xmReq.responseType = "arraybuffer";
   xmReq.onload = function (xmEvent) {
     var arrayBuffer = xmReq.response;
     if (arrayBuffer) {
-      xm = loadXM(arrayBuffer);
+      xm = LoadXM(arrayBuffer);
     } else {
       console.log("unable to load", uri);
     }
@@ -1133,6 +1145,7 @@ function main() {
     var gfxpattern = document.getElementById("gfxpattern");
     gfxpattern.width = _pattern_cellwidth * xm.nchan + _pattern_border;
     var playbutton = document.getElementById('playpause');
+    playbutton.innerHTML='Play';
     playbutton.onclick = function() {
       if (playing) {
         PauseXM();
@@ -1148,6 +1161,11 @@ function main() {
     for (var i = 0; i < xm.nchan; i++) {
       scopes.push(new Float32Array(_scope_width));
     }
+
+    // reset display
+    shown_row = undefined;
+    pat_canvas_patnum = undefined;
+
     audio_events.push({
       t: 0, row: 0, pat: xm.songpats[0],
       vu: new Float32Array(xm.nchan),
@@ -1156,5 +1174,39 @@ function main() {
     RedrawScreen();
   }
   xmReq.send(null);
+}
+
+function InitFilelist() {
+  var el = document.getElementById('filelist');
+  xmuris.forEach(function(entry) {
+    var a = document.createElement('a');
+    a.text = entry[0];
+    a.href = '#'+entry[1];
+    a.onclick = function() {
+      el.style.display = "none";
+      StopXM();
+      DownloadXM(baseuri + entry[1]);
+    }
+    el.appendChild(a);
+    el.appendChild(document.createElement('br'));
+  });
+  var loadbutton = document.getElementById('loadbutton');
+  loadbutton.onclick = function() {
+    if (el.style.display == "none") {
+      el.style.display = "block";
+    } else {
+      el.style.display = "none";
+    }
+  }
+}
+
+function main() {
+  InitAudio();
+  InitFilelist();
+  var uri = location.hash.substr(1);
+  if (uri == "") {
+    uri = "kamel.xm";
+  }
+  DownloadXM(baseuri + uri);
 }
 

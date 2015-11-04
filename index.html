@@ -2,12 +2,17 @@
   <title>js xm</title>
   <script src="xm.js"></script>
   <script src="xmeffects.js"></script>
+  <script src="http://a1k0n-pub.s3-website-us-west-1.amazonaws.com/xm/xmlist.js"></script>
   <style>
-canvas.centered {
+
+.centered {
   display: block;
   margin-left: auto;
   margin-right: auto;
-};
+}
+
+#filelist a { color: #fff; }
+
   </style>
 </head>
 <body onload="main()">
@@ -16,17 +21,22 @@ canvas.centered {
     <div><canvas class="centered" id='vu' width=224 height=64></canvas></div>
     <div><canvas class="centered" id='gfxpattern' width=640 height=200></canvas></div>
     <div id='instruments'></div>
-    <div><button id='playpause' disabled=true style="width: 100px">Play</button></div>
+    <div>
+      <p style="text-align: center">
+        <button id='playpause' disabled=true style="width: 100px">Play</button>
+        <button id='loadbutton' style="width: 100px">Load</button>
+      </p>
+    </div>
+    <div style="display: none" id='filelist'></div>
   </div>
 <pre>
 code: <a href="http://github.com/a1k0n/jsxm/">github.com/a1k0n/jsxm</a>
 todo:
- - file picker, upload more xms to a host we can access cross-origin
- - render instrument list in ft2 font
  - missing XM effects:
    - E3x, E4x, E5x, E6x, E7x, E9x, EDx, EEx
    - 7xy - tremolo
    - Gxx, Hxy, Kxx, Lxx, Pxy, Txy
+ - render pattern with the wider fonts for fewer channels
 </pre>
 </body>
 
