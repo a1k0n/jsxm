@@ -341,7 +341,8 @@ function next_row() {
     }
 
     if (triggernote) {
-      ch.off = 0;
+      // there's gotta be a less hacky way to handle offset commands...
+      if (ch.effect != 9) ch.off = 0;
       ch.release = 0;
       ch.envtick = 0;
       ch.vibratopos = 0;
