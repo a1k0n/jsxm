@@ -472,7 +472,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
 
   var samp = instsamp.sampledata;
   var sample_end = instsamp.len;
-  if ((instsamp.type & 3) == 1) { // todo: support pingpong
+  if ((instsamp.type & 3) == 1 && instsamp.looplen > 0) {
     loop = true;
     loopstart = instsamp.loop;
     looplen = instsamp.looplen;
@@ -511,7 +511,8 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   var failsafe = 100;
   while (i < end) {
     if (failsafe-- == 0) {
-      console.log("failsafe in mixing loop!", k, sample_end, loopstart, looplen, dk);
+      console.log("failsafe in mixing loop! channel", ch.number, k, sample_end,
+          loopstart, looplen, dk);
       break;
     }
     if (k >= sample_end) {  // TODO: implement pingpong looping
