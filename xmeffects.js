@@ -169,9 +169,9 @@ function eff_t0_f(ch, data) {  // set tempo
     console.log("tempo 0?");
     return;
   } else if(data < 0x20) {
-    tempo = data;
+    xm.tempo = data;
   } else {
-    bpm = data;
+    xm.bpm = data;
   }
 }
 
