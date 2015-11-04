@@ -24,6 +24,16 @@ var _fontwidths = [
   3, 6, 6, 6, 6, 6, 4, 6, 6, 2, 4, 6, 2, 8, 6, 6,
   6, 6, 4, 6, 4, 6, 7, 8, 7, 6, 6, 4, 2, 4, 4, 4];
 
+var _bigfontwidths = [
+   4, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+  15, 15, 15, 15, 15, 15, 15, 15, 13, 13, 13, 15, 15, 15, 15, 15,
+   4,  5, 12, 16, 15, 15, 16,  5,  8,  8, 13, 10,  6, 10,  5, 12,
+  15, 15, 15, 15, 15, 15, 15, 15, 15, 15,  5,  6, 12, 10, 12, 15,
+  14, 15, 15, 15, 15, 15, 15, 15, 15,  5, 13, 15, 14, 15, 15, 15,
+  15, 16, 15, 15, 15, 15, 15, 15, 15, 15, 16,  7, 12,  7, 13, 15,
+   5, 13, 13, 13, 13, 13, 11, 13, 13,  5,  9, 13,  5, 16, 13, 13,
+  13, 13, 12, 13, 11, 13, 13, 16, 15, 13, 15,  9,  2,  9, 15, 15];
+
 // draw FT2 proportional font text to a drawing context
 // returns width rendered
 function DrawText(text, dx, dy, ctx) {
@@ -31,9 +41,31 @@ function DrawText(text, dx, dy, ctx) {
   for (var i = 0; i < text.length; i++) {
     var n = text.charCodeAt(i);
     var sx = (n&63)*8;
-    var sy = (n>>6)*10 + 7*8;
+    var sy = (n>>6)*10 + 56;
     var width = _fontwidths[n];
     ctx.drawImage(fontimg, sx, sy, width, 10, dx, dy, width, 10);
+    dx += width + 1;
+  }
+  return dx - dx0;
+}
+
+function TextSize(text, widthtable) {
+  var width = 0;
+  for (var i = 0; i < text.length; i++) {
+    var n = text.charCodeAt(i);
+    width += widthtable[n] + 1;
+  }
+  return width;
+}
+
+function DrawBigText(text, dx, dy, ctx) {
+  var dx0 = dx;
+  for (var i = 0; i < text.length; i++) {
+    var n = text.charCodeAt(i);
+    var sx = (n&31)*16;
+    var sy = (n>>5)*20 + 96;
+    var width = _bigfontwidths[n];
+    ctx.drawImage(fontimg, sx, sy, width, 20, dx, dy, width, 20);
     dx += width + 1;
   }
   return dx - dx0;
@@ -203,7 +235,7 @@ function RedrawScreen() {
     for (var j = 0; j < xm.nchan; j++) {
       var x = _pattern_border + j * _pattern_cellwidth;
       // render channel number
-      DrawText(j, x, 1, ctx);
+      DrawText(''+j, x, 1, ctx);
 
       // volume in dB as a green bar
       var vu_y = -Math.log(VU[j])*10;
@@ -218,9 +250,6 @@ function RedrawScreen() {
       ctx.stroke();
     }
   }
-
-  var debug = document.getElementById("debug");
-  debug.innerHTML = xm.songname + '<br>pat ' + e.pat + ' row ' + (e.row);
 
   if (e.row != shown_row) {
     var gfx = document.getElementById("gfxpattern");
@@ -988,9 +1017,13 @@ function loadXM(arrayBuf) {
     xm.instruments.push(inst);
   }
 
-  var debug = document.getElementById("debug");
   console.log("loaded \"" + xm.songname + "\"");
-  debug.innerHTML = xm.songname;
+
+  var title = document.getElementById("title");
+  // make title element fit text exactly, then render it
+  title.width = TextSize(xm.songname, _bigfontwidths);
+  var ctx = title.getContext('2d');
+  DrawBigText(xm.songname, 0, 1, ctx);
 
   var instrlist = document.getElementById("instruments");
   var instrcols = ((xm.instruments.length + 7) / 8) | 0;

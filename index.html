@@ -2,16 +2,22 @@
   <title>js xm</title>
   <script src="xm.js"></script>
   <script src="xmeffects.js"></script>
+  <style>
+canvas.centered {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+};
+  </style>
 </head>
 <body onload="main()">
   <div style="background:#000">
-    <div><canvas id='vu' width=224 height=64></canvas></div>
-    <div><canvas id='gfxpattern' width=640 height=200></canvas></div>
+    <div><canvas class="centered" id='title' width=640 height=22></canvas></div>
+    <div><canvas class="centered" id='vu' width=224 height=64></canvas></div>
+    <div><canvas class="centered" id='gfxpattern' width=640 height=200></canvas></div>
     <div id='instruments'></div>
     <div><button id='playpause' disabled=true style="width: 100px">Play</button></div>
   </div>
-<pre id='debug'>
-</pre>
 <pre>
 code: <a href="http://github.com/a1k0n/jsxm/">github.com/a1k0n/jsxm</a>
 todo:
