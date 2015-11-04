@@ -8,9 +8,36 @@ fontimg.src = "ft2font.png";
 // canvas to render patterns onto
 var pat_canvas = document.createElement('canvas');
 
-// 
+// for pretty-printing notes
 var _note_names = ["C-", "C#", "D-", "D#", "E-", "F-", "F#", "G-", "G#", "A-", "A#", "B-"];
+
 var f_smp = 44100;  // updated by play callback, default value here
+
+// pixel widths of each character in the proportional font
+var _fontwidths = [
+  4, 7, 3, 6, 6, 6, 6, 5, 4, 5, 5, 5, 5, 5, 7, 7,
+  5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 6, 7, 7, 7, 7, 7,
+  4, 2, 5, 7, 7, 7, 7, 3, 4, 4, 6, 6, 3, 6, 2, 7,
+  6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 2, 3, 6, 6, 6, 7,
+  7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 7, 7, 7, 8, 8, 7,
+  7, 7, 7, 7, 8, 7, 7, 8, 8, 8, 7, 4, 7, 4, 4, 5,
+  3, 6, 6, 6, 6, 6, 4, 6, 6, 2, 4, 6, 2, 8, 6, 6,
+  6, 6, 4, 6, 4, 6, 7, 8, 7, 6, 6, 4, 2, 4, 4, 4];
+
+// draw FT2 proportional font text to a drawing context
+// returns width rendered
+function DrawText(text, dx, dy, ctx) {
+  var dx0 = dx;
+  for (var i = 0; i < text.length; i++) {
+    var n = text.charCodeAt(i);
+    var sx = (n&63)*8;
+    var sy = (n>>6)*10 + 7*8;
+    var width = _fontwidths[n];
+    ctx.drawImage(fontimg, sx, sy, width, 10, dx, dy, width, 10);
+    dx += width + 1;
+  }
+  return dx - dx0;
+}
 
 var _fontmap_notes = [8*5, 8*22, 8*28];
 var _pattern_cellwidth = 16 + 4 + 8 + 4 + 8 + 16 + 4;
@@ -176,10 +203,7 @@ function RedrawScreen() {
     for (var j = 0; j < xm.nchan; j++) {
       var x = _pattern_border + j * _pattern_cellwidth;
       // render channel number
-      if (j >= 10) {
-        ctx.drawImage(fontimg, 8*((j/10)|0), 4*8, 4, 8, x, 1, 4, 8);
-      }
-      ctx.drawImage(fontimg, 8*(j%10), 4*8, 4, 8, x+4, 1, 4, 8);
+      DrawText(j, x, 1, ctx);
 
       // volume in dB as a green bar
       var vu_y = -Math.log(VU[j])*10;
@@ -969,13 +993,46 @@ function loadXM(arrayBuf) {
   debug.innerHTML = xm.songname;
 
   var instrlist = document.getElementById("instruments");
-  var namelist = [];
-  for (var j = 0; j < xm.instruments.length; j++) {
-    var n = (j+1).toString(16);
-    if (j < 15) n = ' ' + n;
-    namelist.push(n + " " + xm.instruments[j].name);
+  var instrcols = ((xm.instruments.length + 7) / 8) | 0;
+  for (var i = 0; i < instrcols; i++) {
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d');
+    var instrcolumnwidth = 8*22;
+    canvas.width = instrcolumnwidth;
+    canvas.height = 8 * 10;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    var hasname = 0, hasdata = 0;
+    for (var j = 8*i; j < Math.min(8*i+8, xm.instruments.length); j++) {
+      var y = 10*(j - 8*i);
+      var n = (j+1).toString(16);
+      if (j < 15) n = '0' + n;
+      var data = xm.instruments[j].samples;
+      if (data) {
+        var len = data[0].len;
+        data = data[0].sampledata;
+        var scale = Math.ceil(len / instrcolumnwidth);
+        ctx.strokeStyle = '#55acff';
+        ctx.beginPath();
+        for (var k = 0; k < Math.min(len / scale, instrcolumnwidth - 20); k++) {
+          ctx.lineTo(k + 20, y + data[k*scale] * 4 + 4);
+        }
+        ctx.stroke();
+        hasdata++;
+      }
+      var name = xm.instruments[j].name;
+      ctx.globalCompositeOperation = 'lighten';
+      DrawText(n, 1, y, ctx);
+      if (name != '') {
+        DrawText(xm.instruments[j].name, 20, y, ctx);
+        hasname++;
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    if (hasname || hasdata) {
+      instrlist.appendChild(canvas);
+    }
   }
-  instrlist.innerHTML = namelist.join("\n");
 
   return xm;
 }

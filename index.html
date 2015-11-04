@@ -4,12 +4,13 @@
   <script src="xmeffects.js"></script>
 </head>
 <body onload="main()">
-  <div><button id='playpause' disabled=true style="width: 100px">Play</button></div>
-  <div><canvas id='vu' width=224 height=64></canvas></div>
-  <div><canvas id='gfxpattern' width=640 height=200></canvas></div>
+  <div style="background:#000">
+    <div><canvas id='vu' width=224 height=64></canvas></div>
+    <div><canvas id='gfxpattern' width=640 height=200></canvas></div>
+    <div id='instruments'></div>
+    <div><button id='playpause' disabled=true style="width: 100px">Play</button></div>
+  </div>
 <pre id='debug'>
-</pre>
-<pre id='instruments'>
 </pre>
 <pre>
 code: <a href="http://github.com/a1k0n/jsxm/">github.com/a1k0n/jsxm</a>
