@@ -243,11 +243,13 @@ function RedrawScreen() {
 
       // oscilloscope
       var scope = scopes[j];
-      ctx.beginPath();
-      for (var k = 0; k < _scope_width; k++) {
-        ctx.lineTo(x + 1 + k, 32 - 16 * scope[k]);
+      if (scope != undefined) {
+        ctx.beginPath();
+        for (var k = 0; k < _scope_width; k++) {
+          ctx.lineTo(x + 1 + k, 32 - 16 * scope[k]);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
     }
   }
 
@@ -753,10 +755,10 @@ function ConvertSample(array, bits) {
     len /= 2;
     var samp = new Float32Array(len);
     for (var k = 0; k < len; k++) {
-      acc += array[k*2] + (array[k*2 + 1] << 8);
-      var b = acc&65535;
+      var b = array[k*2] + (array[k*2 + 1] << 8);
       if (b & 32768) b = b-65536;
-      samp[k] = b / 32768.0;
+      acc = Math.max(-1, Math.min(1, acc + b / 32768.0));
+      samp[k] = acc;
     }
     return samp;
   }
@@ -766,7 +768,6 @@ function ConvertSample(array, bits) {
 // uninterrupted for as long as possible; this also handles pingpong loops.
 function UnrollSampleLoop(samp) {
   var nloops = ((2048 + samp.looplen - 1) / samp.looplen) | 0;
-  console.log(samp.looplen, nloops);
   var pingpong = samp.type & 2;
   if (pingpong) {
     // make sure we have an even number of loops if we are pingponging
@@ -896,9 +897,7 @@ function LoadXM(arrayBuf) {
       'number': i,
     };
     if (nsamp > 0) {
-      // return a slice so we have a fresh copy and don't retain pointers to
-      // the original xm file arraybuf forever
-      var samplemap = new Uint8Array(arrayBuf, idx+33, 96).slice();
+      var samplemap = new Uint8Array(arrayBuf, idx+33, 96);
 
       var env_nvol = dv.getUint8(idx+225);
       var env_vol_type = dv.getUint8(idx+233);
@@ -1074,21 +1073,25 @@ function LoadXM(arrayBuf) {
   return xm;
 }
 
-var playing = false;
 var jsNode, gainNode;
-var paused_events = [];
 function InitAudio() {
   if (audioctx == undefined) {
-    audioContext = window.AudioContext || window.webkitAudioContext;
+    var audioContext = window.AudioContext || window.webkitAudioContext;
     audioctx = new audioContext();
     gainNode = audioctx.createGain();
     gainNode.gain.value = 0.1;  // master volume
   }
-  jsNode = audioctx.createScriptProcessor(16384, 0, 2);
+  if (audioctx.createScriptProcessor == undefined) {
+    jsNode = audioctx.createJavaScriptNode(16384, 0, 2);
+  } else {
+    jsNode = audioctx.createScriptProcessor(16384, 0, 2);
+  }
   jsNode.onaudioprocess = audio_cb;
   gainNode.connect(audioctx.destination);
 }
 
+var playing = false;
+var paused_events = [];
 function PlayXM() {
   if (!playing) {
     // put paused events back into action, if any
@@ -1100,6 +1103,17 @@ function PlayXM() {
     }
     // start playing
     jsNode.connect(gainNode);
+
+    // hack to get iOS to play anything
+    var temp_osc = audioctx.createOscillator();
+    temp_osc.connect(audioctx.destination);
+    if (temp_osc.noteOn) temp_osc.start = temp_osc.noteOn;
+    temp_osc.frequency.value = 1;
+    temp_osc.start(0);
+    window.setTimeout(10, function() {
+      temp_osc.disconnect();
+    });
+
     requestAnimationFrame(RedrawScreen);
   }
   playing = true;
@@ -1108,7 +1122,7 @@ function PlayXM() {
 function PauseXM() {
   if (playing) {
     jsNode.disconnect(gainNode);
-    // grab all the audio events 
+    // grab all the audio events
     var t = audioctx.currentTime;
     while (audio_events.length > 0) {
       var e = audio_events.shift();
@@ -1130,6 +1144,45 @@ function StopXM() {
   InitAudio();
 }
 
+function LoadXMAndInit(xmdata) {
+  xm = LoadXM(xmdata);
+  if (!xm) return;
+
+  document.getElementById('vu').width = _pattern_border + _pattern_cellwidth * xm.nchan;
+  var gfxpattern = document.getElementById("gfxpattern");
+  gfxpattern.width = _pattern_cellwidth * xm.nchan + _pattern_border;
+  var playbutton = document.getElementById('playpause');
+  playbutton.innerHTML='Play';
+  playbutton.onclick = function() {
+    if (playing) {
+      PauseXM();
+      playbutton.innerHTML='Play';
+    } else {
+      PlayXM();
+      playbutton.innerHTML='Pause';
+    }
+  }
+  playbutton.disabled = false;
+  // generate a fake audio event to render the initial paused screen
+  var scopes = [];
+  for (var i = 0; i < xm.nchan; i++) {
+    scopes.push(new Float32Array(_scope_width));
+  }
+
+  // reset display
+  shown_row = undefined;
+  pat_canvas_patnum = undefined;
+
+  audio_events.push({
+    t: 0, row: 0, pat: xm.songpats[0],
+    vu: new Float32Array(xm.nchan),
+    scopes: scopes
+  });
+  RedrawScreen();
+
+  return xm;
+}
+
 function DownloadXM(uri) {
   var xmReq = new XMLHttpRequest();
   xmReq.open("GET", uri, true);
@@ -1137,43 +1190,35 @@ function DownloadXM(uri) {
   xmReq.onload = function (xmEvent) {
     var arrayBuffer = xmReq.response;
     if (arrayBuffer) {
-      xm = LoadXM(arrayBuffer);
+      xm = LoadXMAndInit(arrayBuffer);
     } else {
       console.log("unable to load", uri);
     }
-    document.getElementById('vu').width = _pattern_border + _pattern_cellwidth * xm.nchan;
-    var gfxpattern = document.getElementById("gfxpattern");
-    gfxpattern.width = _pattern_cellwidth * xm.nchan + _pattern_border;
-    var playbutton = document.getElementById('playpause');
-    playbutton.innerHTML='Play';
-    playbutton.onclick = function() {
-      if (playing) {
-        PauseXM();
-        playbutton.innerHTML='Play';
-      } else {
-        PlayXM();
-        playbutton.innerHTML='Pause';
-      }
-    }
-    playbutton.disabled = false;
-    // generate a fake audio event to render the initial paused screen
-    var scopes = [];
-    for (var i = 0; i < xm.nchan; i++) {
-      scopes.push(new Float32Array(_scope_width));
-    }
-
-    // reset display
-    shown_row = undefined;
-    pat_canvas_patnum = undefined;
-
-    audio_events.push({
-      t: 0, row: 0, pat: xm.songpats[0],
-      vu: new Float32Array(xm.nchan),
-      scopes: scopes
-    });
-    RedrawScreen();
   }
   xmReq.send(null);
+}
+
+function allowDrop(ev) {
+  ev.stopPropagation();
+  ev.preventDefault();
+  var elem = document.getElementById("playercontainer");
+  elem.className = (ev.type == "dragover" ? "draghover" : "playercontainer");
+  return false;
+}
+
+function handleDrop(e) {
+  console.log(e);
+  e.preventDefault();
+  var elem = document.getElementById("playercontainer");
+  elem.className = "playercontainer";
+  var files = e.target.files || e.dataTransfer.files;
+  if (files.length < 1) return false;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    LoadXMAndInit(e.target.result);
+  }
+  reader.readAsArrayBuffer(files[0]);
+  return false;
 }
 
 function InitFilelist() {
@@ -1200,13 +1245,16 @@ function InitFilelist() {
   }
 }
 
-function main() {
+window.onload = function() {
   InitAudio();
   InitFilelist();
+
   var uri = location.hash.substr(1);
   if (uri == "") {
     uri = "kamel.xm";
   }
-  DownloadXM(baseuri + uri);
+  if (!uri.startsWith("http")) {
+    uri = baseuri + uri;
+  }
+  DownloadXM(uri);
 }
-

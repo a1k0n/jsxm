@@ -13,22 +13,59 @@
 
 #filelist a { color: #fff; }
 
+.playercontainer {
+  background:#000;
+}
+
+.draghover {
+  background:#000;
+  opacity: 0.5;
+}
+
+.hscroll {
+  overflow: auto;
+  margin-bottom: 14px;
+}
+
+.hscroll::-webkit-scrollbar {
+    -webkit-appearance: none;
+}
+
+.hscroll::-webkit-scrollbar:horizontal {
+    height: 11px;
+}
+
+.hscroll::-webkit-scrollbar-thumb {
+    border-radius: 2px;
+    border: 1px solid #93C3E9; /* should match background, can't be transparent */
+    background-color: #A0D4FD;
+}
+
+.hscroll::-webkit-scrollbar-track {
+    background-color: #333;
+    border-radius: 8px;
+}
+
   </style>
 </head>
-<body onload="main()">
-  <div style="background:#000">
-    <div><canvas class="centered" id='title' width=640 height=22></canvas></div>
-    <div><canvas class="centered" id='vu' width=224 height=64></canvas></div>
-    <div><canvas class="centered" id='gfxpattern' width=640 height=200></canvas></div>
+<body>
+  <div id="playercontainer" class="playercontainer" ondrop="handleDrop(event)"
+      ondragover="allowDrop(event)" ondragleave="allowDrop(event)">
+    <div><canvas class="centered" id='title' width="640" height="22"></canvas></div>
+    <div class="hscroll">
+      <div><canvas class="centered" id='vu' width="224" height="64"></canvas></div>
+      <div><canvas class="centered" id='gfxpattern' width="640" height="200"></canvas></div>
+    </div>
     <div id='instruments'></div>
     <div>
       <p style="text-align: center">
-        <button id='playpause' disabled=true style="width: 100px">Play</button>
-        <button id='loadbutton' style="width: 100px">Load</button>
+        <button id="playpause" disabled="true" style="width: 100px; background: #ccc;">Play</button>
+        <button id="loadbutton" style="width: 100px; background: #ccc">Load</button>
       </p>
     </div>
     <div style="display: none" id='filelist'></div>
   </div>
+
 <pre>
 code: <a href="http://github.com/a1k0n/jsxm/">github.com/a1k0n/jsxm</a>
 todo:
@@ -37,7 +74,7 @@ todo:
    - 7xy - tremolo
    - Gxx, Hxy, Kxx, Lxx, Pxy, Txy
  - render pattern with the wider fonts for fewer channels
- - drag-n-drop .xm files onto player
+ - fix occasional rendering/audio hiccups when switching songs
 </pre>
 </body>
 
