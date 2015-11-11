@@ -1,0 +1,11 @@
+{
+  "name": "jsxm",
+  "version": "1",
+  "main": "index.html",
+  "window": {
+    "frame": true,
+    "toolbar": false,
+    "position": "center",
+    "resizable": true
+  }
+}
