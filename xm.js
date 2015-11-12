@@ -25,6 +25,7 @@ player.xm = {};  // contains all song data
 
 // exposed for testing
 player.nextTick = nextTick;
+player.nextRow = nextRow;
 player.Envelope = Envelope;
 
 // for pretty-printing notes
