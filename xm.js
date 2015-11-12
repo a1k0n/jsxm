@@ -1,4 +1,19 @@
-var xm;  // contains all song data
+(function (window, document) {
+if (!window.XMPlayer) {
+  window.XMPlayer = {};
+}
+var player = window.XMPlayer;
+player.allowDrop = allowDrop;
+player.handleDrop = handleDrop;
+player.PeriodForNote = PeriodForNote;
+player.prettify_effect = prettify_effect;
+player.cur_songpos = -1;
+player.cur_pat = -1;
+player.cur_row = 64;
+player.cur_ticksamp = 0;
+player.cur_tick = 6;
+player.xm = {}; // contains all song data
+
 var audioctx;  // AudioContext
 
 // Load font (ripped from FastTracker 2)
@@ -232,7 +247,7 @@ function RedrawScreen() {
     ctx.fillRect(0, 0, canvas.width, 64);
     ctx.fillStyle = '#0f0';
     ctx.strokeStyle = '#55acff';
-    for (var j = 0; j < xm.nchan; j++) {
+    for (var j = 0; j < player.xm.nchan; j++) {
       var x = _pattern_border + j * _pattern_cellwidth;
       // render channel number
       DrawText(''+j, x, 1, ctx);
@@ -256,9 +271,9 @@ function RedrawScreen() {
   if (e.row != shown_row) {
     var gfx = document.getElementById("gfxpattern");
     if (e.pat != pat_canvas_patnum) {
-      var p = xm.patterns[e.pat];
+      var p = player.xm.patterns[e.pat];
       if (p != undefined) {
-        RenderPattern(pat_canvas, xm.patterns[e.pat]);
+        RenderPattern(pat_canvas, player.xm.patterns[e.pat]);
         pat_canvas_patnum = e.pat;
       }
     }
@@ -279,26 +294,24 @@ function RedrawScreen() {
   }
 }
 
-var cur_songpos = -1, cur_pat = -1, cur_row = 64, cur_ticksamp = 0;
-var cur_tick = 6;
 function next_row() {
-  if (cur_pat == -1 || cur_row >= xm.patterns[cur_pat].length) {
-    cur_row = 0;
-    cur_songpos++;
-    if (cur_songpos >= xm.songpats.length)
-      cur_songpos = xm.song_looppos;
-    cur_pat = xm.songpats[cur_songpos];
+  if (player.cur_pat == -1 || player.cur_row >= player.xm.patterns[player.cur_pat].length) {
+    player.cur_row = 0;
+    player.cur_songpos++;
+    if (player.cur_songpos >= player.xm.songpats.length)
+      player.cur_songpos = player.xm.song_looppos;
+    player.cur_pat = player.xm.songpats[player.cur_songpos];
   }
-  var p = xm.patterns[cur_pat];
-  var r = p[cur_row];
-  cur_row++;
+  var p = player.xm.patterns[player.cur_pat];
+  var r = p[player.cur_row];
+  player.cur_row++;
   for (var i = 0; i < r.length; i++) {
-    var ch = xm.channelinfo[i];
+    var ch = player.xm.channelinfo[i];
     var inst = ch.inst;
     var triggernote = false;
     // instrument trigger
     if (r[i][1] != -1) {
-      inst = xm.instruments[r[i][1] - 1];
+      inst = player.xm.instruments[r[i][1] - 1];
       if (inst && inst.samplemap) {
         ch.inst = inst;
         // retrigger unless overridden below
@@ -364,8 +377,8 @@ function next_row() {
     ch.effect = r[i][3];
     ch.effectdata = r[i][4];
     if (ch.effect < 36) {
-      ch.effectfn = effects_t1[ch.effect];
-      var eff_t0 = effects_t0[ch.effect];
+      ch.effectfn = player.effects_t1[ch.effect];
+      var eff_t0 = player.effects_t0[ch.effect];
       if (eff_t0 && eff_t0(ch, ch.effectdata)) {
         triggernote = false;
       }
@@ -460,26 +473,26 @@ EnvelopeFollower.prototype.Tick = function(release) {
 }
 
 function next_tick() {
-  cur_tick++;
-  if (cur_tick >= xm.tempo) {
-    cur_tick = 0;
+  player.cur_tick++;
+  if (player.cur_tick >= player.xm.tempo) {
+    player.cur_tick = 0;
     next_row();
   }
-  for (var j = 0; j < xm.nchan; j++) {
-    var ch = xm.channelinfo[j];
+  for (var j = 0; j < player.xm.nchan; j++) {
+    var ch = player.xm.channelinfo[j];
     var inst = ch.inst;
     ch.periodoffset = 0;
-    if (cur_tick != 0) {
+    if (player.cur_tick != 0) {
       if(ch.voleffectfn) ch.voleffectfn(ch);
       if(ch.effectfn) ch.effectfn(ch);
     }
     if (isNaN(ch.period)) {
-      console.log(prettify_notedata(xm.patterns[cur_pat][cur_row-1][j]),
+      console.log(prettify_notedata(player.xm.patterns[player.cur_pat][player.cur_row-1][j]),
           "set channel", j, "period to NaN");
     }
     if (inst == undefined) continue;
     if (ch.env_vol == undefined) {
-      console.log(prettify_notedata(xm.patterns[cur_pat][cur_row-1][j]),
+      console.log(prettify_notedata(player.xm.patterns[player.cur_pat][player.cur_row-1][j]),
           "set channel", j, "env_vol to undefined, but note is playing");
       continue;
     }
@@ -691,17 +704,17 @@ function audio_cb(e) {
   }
 
   var offset = 0;
-  var ticklen = 0|(f_smp * 2.5 / xm.bpm);
+  var ticklen = 0|(f_smp * 2.5 / player.xm.bpm);
 
   while(buflen > 0) {
-    if (cur_pat == -1 || cur_ticksamp >= ticklen) {
+    if (player.cur_pat == -1 || player.cur_ticksamp >= ticklen) {
       next_tick(f_smp);
-      cur_ticksamp -= ticklen;
+      player.cur_ticksamp -= ticklen;
     }
-    var tickduration = Math.min(buflen, ticklen - cur_ticksamp);
-    var VU = new Float32Array(xm.nchan);
+    var tickduration = Math.min(buflen, ticklen - player.cur_ticksamp);
+    var VU = new Float32Array(player.xm.nchan);
     var scopes = undefined;
-    for (var j = 0; j < xm.nchan; j++) {
+    for (var j = 0; j < player.xm.nchan; j++) {
       var scope;
       if (tickduration >= 4*_scope_width) {
         scope = new Float32Array(_scope_width);
@@ -711,7 +724,7 @@ function audio_cb(e) {
       }
 
       VU[j] = MixChannelIntoBuf(
-          xm.channelinfo[j], offset, offset + tickduration, dataL, dataR) /
+          player.xm.channelinfo[j], offset, offset + tickduration, dataL, dataR) /
         tickduration;
 
       if (tickduration >= 4*_scope_width) {
@@ -726,15 +739,15 @@ function audio_cb(e) {
       t: e.playbackTime + (0.0 + offset) / f_smp,
       vu: VU,
       scopes: scopes,
-      songpos: cur_songpos,
-      pat: cur_pat,
-      row: cur_row - 1
+      songpos: player.cur_songpos,
+      pat: player.cur_pat,
+      row: player.cur_row - 1
     });
     if (audio_events.length == 1) {
       requestAnimationFrame(RedrawScreen);
     }
     offset += tickduration;
-    cur_ticksamp += tickduration;
+    player.cur_ticksamp += tickduration;
     buflen -= tickduration;
   }
 }
@@ -797,22 +810,22 @@ function UnrollSampleLoop(samp) {
 
 function LoadXM(arrayBuf) {
   var dv = new DataView(arrayBuf);
-  var xm = {};
+  player.xm = {};
 
-  xm.songname = getstring(dv, 17, 20);
+  player.xm.songname = getstring(dv, 17, 20);
   var hlen = dv.getUint32(0x3c, true) + 0x3c;
   var songlen = dv.getUint16(0x40, true);
-  xm.song_looppos = dv.getUint16(0x42, true);
-  xm.nchan = dv.getUint16(0x44, true);
+  player.xm.song_looppos = dv.getUint16(0x42, true);
+  player.xm.nchan = dv.getUint16(0x44, true);
   var npat = dv.getUint16(0x46, true);
   var ninst = dv.getUint16(0x48, true);
-  xm.flags = dv.getUint16(0x4a, true);
-  xm.tempo = dv.getUint16(0x4c, true);
-  xm.bpm = dv.getUint16(0x4e, true);
-  xm.channelinfo = [];
+  player.xm.flags = dv.getUint16(0x4a, true);
+  player.xm.tempo = dv.getUint16(0x4c, true);
+  player.xm.bpm = dv.getUint16(0x4e, true);
+  player.xm.channelinfo = [];
 
-  for (var i = 0; i < xm.nchan; i++) {
-    xm.channelinfo.push({
+  for (var i = 0; i < player.xm.nchan; i++) {
+    player.xm.channelinfo.push({
       number: i,
       filterstate: new Float32Array(3),
       vol: 0,
@@ -829,18 +842,18 @@ function LoadXM(arrayBuf) {
   }
   console.log("header len " + hlen);
 
-  console.log("songlen %d, %d channels, %d patterns, %d instruments", songlen, xm.nchan, npat, ninst);
-  console.log("loop @%d", xm.song_looppos);
-  console.log("flags=%d tempo %d bpm %d", xm.flags, xm.tempo, xm.bpm);
+  console.log("songlen %d, %d channels, %d patterns, %d instruments", songlen, player.xm.nchan, npat, ninst);
+  console.log("loop @%d", player.xm.song_looppos);
+  console.log("flags=%d tempo %d bpm %d", player.xm.flags, player.xm.tempo, player.xm.bpm);
 
-  xm.songpats = [];
+  player.xm.songpats = [];
   for (var i = 0; i < songlen; i++) {
-    xm.songpats.push(dv.getUint8(0x50 + i));
+    player.xm.songpats.push(dv.getUint8(0x50 + i));
   }
-  console.log("song patterns: ", xm.songpats);
+  console.log("song patterns: ", player.xm.songpats);
 
   var idx = hlen;
-  xm.patterns = [];
+  player.xm.patterns = [];
   for (var i = 0; i < npat; i++) {
     var pattern = [];
     var patheaderlen = dv.getUint32(idx, true);
@@ -850,7 +863,7 @@ function LoadXM(arrayBuf) {
     idx += 9;
     for (var j = 0; patsize > 0 && j < patrows; j++) {
       row = [];
-      for (var k = 0; k < xm.nchan; k++) {
+      for (var k = 0; k < player.xm.nchan; k++) {
         var byte0 = dv.getUint8(idx); idx++;
         var note = -1, inst = -1, vol = -1, efftype = 0, effparam = 0;
         if (byte0 & 0x80) {
@@ -883,10 +896,10 @@ function LoadXM(arrayBuf) {
       }
       pattern.push(row);
     }
-    xm.patterns.push(pattern);
+    player.xm.patterns.push(pattern);
   }
 
-  xm.instruments = [];
+  player.xm.instruments = [];
   // now load instruments
   for (i = 0; i < ninst; i++) {
     var hdrsiz = dv.getUint32(idx, true);
@@ -1013,23 +1026,23 @@ function LoadXM(arrayBuf) {
       idx += hdrsiz;
       console.log("empty instrument", i, hdrsiz, idx);
     }
-    xm.instruments.push(inst);
+    player.xm.instruments.push(inst);
   }
 
-  console.log("loaded \"" + xm.songname + "\"");
+  console.log("loaded \"" + player.xm.songname + "\"");
 
   var title = document.getElementById("title");
   // make title element fit text exactly, then render it
-  title.width = TextSize(xm.songname, _bigfontwidths);
+  title.width = TextSize(player.xm.songname, _bigfontwidths);
   var ctx = title.getContext('2d');
-  DrawBigText(xm.songname, 0, 1, ctx);
+  DrawBigText(player.xm.songname, 0, 1, ctx);
 
   var instrlist = document.getElementById("instruments");
   // clear instrument list if not already clear
   while (instrlist.childNodes.length) {
     instrlist.removeChild(instrlist.childNodes[0]);
   }
-  var instrcols = ((xm.instruments.length + 7) / 8) | 0;
+  var instrcols = ((player.xm.instruments.length + 7) / 8) | 0;
   for (var i = 0; i < instrcols; i++) {
     var canvas = document.createElement('canvas');
     var ctx = canvas.getContext('2d');
@@ -1039,11 +1052,11 @@ function LoadXM(arrayBuf) {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     var hasname = 0, hasdata = 0;
-    for (var j = 8*i; j < Math.min(8*i+8, xm.instruments.length); j++) {
+    for (var j = 8*i; j < Math.min(8*i+8, player.xm.instruments.length); j++) {
       var y = 10*(j - 8*i);
       var n = (j+1).toString(16);
       if (j < 15) n = '0' + n;
-      var data = xm.instruments[j].samples;
+      var data = player.xm.instruments[j].samples;
       if (data) {
         var len = data[0].len;
         data = data[0].sampledata;
@@ -1056,11 +1069,11 @@ function LoadXM(arrayBuf) {
         ctx.stroke();
         hasdata++;
       }
-      var name = xm.instruments[j].name;
+      var name = player.xm.instruments[j].name;
       ctx.globalCompositeOperation = 'lighten';
       DrawText(n, 1, y, ctx);
       if (name != '') {
-        DrawText(xm.instruments[j].name, 20, y, ctx);
+        DrawText(player.xm.instruments[j].name, 20, y, ctx);
         hasname++;
       }
       ctx.globalCompositeOperation = 'source-over';
@@ -1070,7 +1083,7 @@ function LoadXM(arrayBuf) {
     }
   }
 
-  return xm;
+  return player.xm;
 }
 
 var jsNode, gainNode;
@@ -1110,7 +1123,7 @@ function PlayXM() {
     if (temp_osc.noteOn) temp_osc.start = temp_osc.noteOn;
     temp_osc.frequency.value = 1;
     temp_osc.start(0);
-    window.setTimeout(10, function() {
+    setTimeout(10, function() {
       temp_osc.disconnect();
     });
 
@@ -1140,17 +1153,17 @@ function StopXM() {
     audio_events = [];
     paused_events = [];
   }
-  cur_songpos = -1, cur_pat = -1, cur_row = 64, cur_ticksamp = 0;
+  player.cur_songpos = -1, player.cur_pat = -1, player.cur_row = 64, player.cur_ticksamp = 0;
   InitAudio();
 }
 
 function LoadXMAndInit(xmdata) {
-  xm = LoadXM(xmdata);
-  if (!xm) return;
+  player.xm = LoadXM(xmdata);
+  if (!player.xm) return;
 
-  document.getElementById('vu').width = _pattern_border + _pattern_cellwidth * xm.nchan;
+  document.getElementById('vu').width = _pattern_border + _pattern_cellwidth * player.xm.nchan;
   var gfxpattern = document.getElementById("gfxpattern");
-  gfxpattern.width = _pattern_cellwidth * xm.nchan + _pattern_border;
+  gfxpattern.width = _pattern_cellwidth * player.xm.nchan + _pattern_border;
   var playbutton = document.getElementById('playpause');
   playbutton.innerHTML='Play';
   playbutton.onclick = function() {
@@ -1165,7 +1178,7 @@ function LoadXMAndInit(xmdata) {
   playbutton.disabled = false;
   // generate a fake audio event to render the initial paused screen
   var scopes = [];
-  for (var i = 0; i < xm.nchan; i++) {
+  for (var i = 0; i < player.xm.nchan; i++) {
     scopes.push(new Float32Array(_scope_width));
   }
 
@@ -1174,13 +1187,13 @@ function LoadXMAndInit(xmdata) {
   pat_canvas_patnum = undefined;
 
   audio_events.push({
-    t: 0, row: 0, pat: xm.songpats[0],
-    vu: new Float32Array(xm.nchan),
+    t: 0, row: 0, pat: player.xm.songpats[0],
+    vu: new Float32Array(player.xm.nchan),
     scopes: scopes
   });
   RedrawScreen();
 
-  return xm;
+  return player.xm;
 }
 
 function DownloadXM(uri) {
@@ -1190,7 +1203,7 @@ function DownloadXM(uri) {
   xmReq.onload = function (xmEvent) {
     var arrayBuffer = xmReq.response;
     if (arrayBuffer) {
-      xm = LoadXMAndInit(arrayBuffer);
+      player.xm = LoadXMAndInit(arrayBuffer);
     } else {
       console.log("unable to load", uri);
     }
@@ -1258,3 +1271,4 @@ window.onload = function() {
   }
   DownloadXM(uri);
 }
+})(window || {}, document);

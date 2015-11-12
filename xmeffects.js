@@ -1,8 +1,14 @@
+(function (window) {
+if (!window.XMPlayer) {
+  window.XMPlayer = {};
+}
+var player = window.XMPlayer;
+
 function eff_t1_0(ch) {  // arpeggio
   if (ch.effectdata != 0 && ch.inst != undefined) {
     var arpeggio = [0, ch.effectdata>>4, ch.effectdata&15];
-    var note = ch.note + arpeggio[cur_tick % 3];
-    ch.period = PeriodForNote(ch, note);
+    var note = ch.note + arpeggio[player.cur_tick % 3];
+    ch.period = player.PeriodForNote(ch, note);
   }
 }
 
@@ -103,9 +109,9 @@ function eff_t1_a(ch) {  // volume slide
 }
 
 function eff_t0_b(ch, data) {  // song jump (untested)
-  if (data < xm.songpats.length) {
-    cur_songpos = data
-    cur_pat = xm.songpats[cur_songpos];
+  if (data < player.xm.songpats.length) {
+    player.cur_songpos = data;
+    player.cur_pat = player.xm.songpats[player.cur_songpos];
   }
 }
 
@@ -114,11 +120,11 @@ function eff_t0_c(ch, data) {  // set volume
 }
 
 function eff_t0_d(ch, data) {  // pattern jump
-  cur_songpos++;
-  if (cur_songpos >= xm.songpats.length)
-    cur_songpos = xm.song_looppos;
-  cur_pat = xm.songpats[cur_songpos];
-  cur_row = data;
+  player.cur_songpos++;
+  if (player.cur_songpos >= player.xm.songpats.length)
+    player.cur_songpos = player.xm.song_looppos;
+  player.cur_pat = player.xm.songpats[player.cur_songpos];
+  player.cur_row = data;
 }
 
 function eff_t0_e(ch, data) {  // extended effects!
@@ -157,7 +163,7 @@ function eff_t0_e(ch, data) {  // extended effects!
 function eff_t1_e(ch) {  // note cut
   switch (ch.effectdata >> 4) {
     case 0x0c:
-      if (cur_tick == (ch.effectdata & 0x0f)) {
+      if (player.cur_tick == (ch.effectdata & 0x0f)) {
         ch.vol = 0;
       }
       break;
@@ -168,10 +174,10 @@ function eff_t0_f(ch, data) {  // set tempo
   if (data == 0) {
     console.log("tempo 0?");
     return;
-  } else if(data < 0x20) {
-    xm.tempo = data;
+  } else if (data < 0x20) {
+    player.xm.tempo = data;
   } else {
-    xm.bpm = data;
+    player.xm.bpm = data;
   }
 }
 
@@ -200,17 +206,17 @@ function eff_t0_r(ch, data) {  // retrigger
 }
 
 function eff_t1_r(ch) {
-  if (cur_tick % (ch.retrig & 0x0f) == 0) {
+  if (player.cur_tick % (ch.retrig & 0x0f) == 0) {
     ch.off = 0;
   }
 }
 
 function eff_unimplemented() {}
 function eff_unimplemented_t0(ch, data) {
-  console.log("unimplemented effect", prettify_effect(ch.effect, data));
+  console.log("unimplemented effect", player.prettify_effect(ch.effect, data));
 }
 
-var effects_t0 = [  // effect functions on tick 0
+player.effects_t0 = [  // effect functions on tick 0
   eff_t1_0,  // 1, arpeggio is processed on all ticks
   eff_t0_1,
   eff_t0_2,
@@ -249,7 +255,7 @@ var effects_t0 = [  // effect functions on tick 0
   eff_unimplemented_t0,  // z
 ];
 
-var effects_t1 = [  // effect functions on tick 1+
+player.effects_t1 = [  // effect functions on tick 1+
   eff_t1_0,
   eff_t1_1,
   eff_t1_2,
@@ -287,3 +293,4 @@ var effects_t1 = [  // effect functions on tick 1+
   eff_unimplemented,  // y
   eff_unimplemented   // z
 ];
+})(window || {});
