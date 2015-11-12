@@ -1,4 +1,4 @@
-(function (window, document) {
+(function (window) {
 if (!window.XMPlayer) {
   window.XMPlayer = {};
 }
@@ -7,14 +7,15 @@ var player = window.XMPlayer;
 if (!window.XMView) {
   window.XMView = {};
 }
-var view = window.XMView;
+var XMView = window.XMView;
 
 player.PeriodForNote = PeriodForNote;
 player.prettify_effect = prettify_effect;
+player.initAudio = initAudio;
+player.loadXM = loadXM;
 player.playXM = playXM;
 player.pauseXM = pauseXM;
 player.stopXM = stopXM;
-player.downloadXM = downloadXM;
 player.cur_songpos = -1;
 player.cur_pat = -1;
 player.cur_row = 64;
@@ -513,7 +514,7 @@ function audio_cb(e) {
 
   var offset = 0;
   var ticklen = 0|(f_smp * 2.5 / player.xm.bpm);
-  var _scope_width = view.scope_width || 0;
+  var scopewidth = XMView.scope_width;
 
   while(buflen > 0) {
     if (player.cur_pat == -1 || player.cur_ticksamp >= ticklen) {
@@ -522,12 +523,12 @@ function audio_cb(e) {
     }
     var tickduration = Math.min(buflen, ticklen - player.cur_ticksamp);
     var VU = new Float32Array(player.xm.nchan);
-    var scopes;
+    var scopes = undefined;
     for (j = 0; j < player.xm.nchan; j++) {
       var scope;
-      if (tickduration >= 4*_scope_width) {
-        scope = new Float32Array(_scope_width);
-        for (k = 0; k < _scope_width; k++) {
+      if (tickduration >= 4*scopewidth) {
+        scope = new Float32Array(scopewidth);
+        for (k = 0; k < scopewidth; k++) {
           scope[k] = -dataL[offset+k*4] - dataR[offset+k*4];
         }
       }
@@ -536,25 +537,27 @@ function audio_cb(e) {
           player.xm.channelinfo[j], offset, offset + tickduration, dataL, dataR) /
         tickduration;
 
-      if (tickduration >= 4*_scope_width) {
-        for (k = 0; k < _scope_width; k++) {
+      if (tickduration >= 4*scopewidth) {
+        for (k = 0; k < scopewidth; k++) {
           scope[k] += dataL[offset+k*4] + dataR[offset+k*4];
         }
         if (scopes === undefined) scopes = [];
         scopes.push(scope);
       }
     }
-    view.pushEvent({
-      t: e.playbackTime + (0.0 + offset) / f_smp,
-      vu: VU,
-      scopes: scopes,
-      songpos: player.cur_songpos,
-      pat: player.cur_pat,
-      row: player.cur_row - 1
-    });
-    offset += tickduration;
-    player.cur_ticksamp += tickduration;
-    buflen -= tickduration;
+    if (XMView.pushEvent) {
+      XMView.pushEvent({
+        t: e.playbackTime + (0.0 + offset) / f_smp,
+        vu: VU,
+        scopes: scopes,
+        songpos: player.cur_songpos,
+        pat: player.cur_pat,
+        row: player.cur_row - 1
+      });
+      offset += tickduration;
+      player.cur_ticksamp += tickduration;
+      buflen -= tickduration;
+    }
   }
 }
 
@@ -616,7 +619,7 @@ function UnrollSampleLoop(samp) {
   samp.type = 1;
 }
 
-function LoadXM(arrayBuf) {
+function loadXM(arrayBuf) {
   var dv = new DataView(arrayBuf);
   player.xm = {};
 
@@ -839,8 +842,7 @@ function LoadXM(arrayBuf) {
   }
 
   console.log("loaded \"" + player.xm.songname + "\"");
-
-  return player.xm;
+  return true;
 }
 
 var jsNode, gainNode;
@@ -860,11 +862,11 @@ function initAudio() {
   gainNode.connect(player.audioctx.destination);
 }
 
-var playing = false;
+player.playing = false;
 function playXM() {
-  if (!playing) {
+  if (!player.playing) {
     // put paused events back into action, if any
-    view.resume();
+    if (XMView.resume) XMView.resume();
     // start playing
     jsNode.connect(gainNode);
 
@@ -881,125 +883,27 @@ function playXM() {
     });
     */
   }
-  playing = true;
+  player.playing = true;
 }
 
 function pauseXM() {
-  if (playing) {
+  if (player.playing) {
     jsNode.disconnect(gainNode);
-    view.pause();
+    if (XMView.pause) XMView.pause();
   }
-  playing = false;
+  player.playing = false;
 }
 
 function stopXM() {
-  if (playing) {
+  if (player.playing) {
     jsNode.disconnect(gainNode);
-    playing = false;
+    player.playing = false;
   }
   player.cur_pat = -1;
   player.cur_row = 64;
   player.cur_songpos = -1;
   player.cur_ticksamp = 0;
+  if (XMView.stop) XMView.stop();
   initAudio();
 }
-
-function loadXMAndInit(xmdata) {
-  player.xm = LoadXM(xmdata);
-  if (!player.xm) return;
-
-  view.init();
-
-  var playbutton = document.getElementById("playpause");
-  playbutton.innerHTML='Play';
-  playbutton.onclick = function() {
-    if (playing) {
-      pauseXM();
-      playbutton.innerHTML='Play';
-    } else {
-      playXM();
-      playbutton.innerHTML='Pause';
-    }
-  };
-  playbutton.disabled = false;
-
-  return player.xm;
-}
-
-function downloadXM(uri) {
-  var xmReq = new XMLHttpRequest();
-  xmReq.open("GET", uri, true);
-  xmReq.responseType = "arraybuffer";
-  xmReq.onload = function (xmEvent) {
-    var arrayBuffer = xmReq.response;
-    if (arrayBuffer) {
-      player.xm = loadXMAndInit(arrayBuffer);
-    } else {
-      console.log("unable to load", uri);
-    }
-  };
-  xmReq.send(null);
-}
-
-player.allowDrop = function(ev) {
-  ev.stopPropagation();
-  ev.preventDefault();
-  var elem = document.getElementById("playercontainer");
-  elem.className = (ev.type == "dragover" ? "draghover" : "playercontainer");
-  return false;
-};
-
-player.handleDrop = function(e) {
-  console.log(e);
-  e.preventDefault();
-  var elem = document.getElementById("playercontainer");
-  elem.className = "playercontainer";
-  var files = e.target.files || e.dataTransfer.files;
-  if (files.length < 1) return false;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    stopXM();
-    loadXMAndInit(e.target.result);
-  };
-  reader.readAsArrayBuffer(files[0]);
-  return false;
-};
-
-function initFilelist() {
-  var el = document.getElementById('filelist');
-  xmuris.forEach(function(entry) {
-    var a = document.createElement('a');
-    a.text = entry[0];
-    a.href = '#'+entry[1];
-    a.onclick = function() {
-      el.style.display = "none";
-      stopXM();
-      downloadXM(baseuri + entry[1]);
-    };
-    el.appendChild(a);
-    el.appendChild(document.createElement('br'));
-  });
-  var loadbutton = document.getElementById('loadbutton');
-  loadbutton.onclick = function() {
-    if (el.style.display == "none") {
-      el.style.display = "block";
-    } else {
-      el.style.display = "none";
-    }
-  };
-}
-
-window.onload = function() {
-  initAudio();
-  initFilelist();
-
-  var uri = location.hash.substr(1);
-  if (uri === "") {
-    uri = "kamel.xm";
-  }
-  if (!uri.startsWith("http")) {
-    uri = baseuri + uri;
-  }
-  downloadXM(uri);
-};
-})(window, document);
+})(window);

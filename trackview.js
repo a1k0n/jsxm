@@ -27,8 +27,8 @@ fontimg.src = "ft2font.png";
 var _fontmap_notes = [8*5, 8*22, 8*28];
 var pat_canvas_patnum;
 
-var audio_events = [];
-var paused_events = [];
+var audio_events;
+var paused_events;
 var shown_row;
 
 // canvas to render patterns onto
@@ -156,19 +156,22 @@ function RenderPattern(canv, pattern) {
 }
 
 function redrawScreen() {
-  if (audio_events.length === 0) return;
-
   var e;
   var t = player.audioctx.currentTime;
-  do {
+  while (audio_events.length > 0 && audio_events[0].t < t) {
     e = audio_events.shift();
-  } while(e.t < t && audio_events.length > 0);
-  if (!e) return;
+  }
+  if (!e) {
+    if (player.playing) {
+      window.requestAnimationFrame(redrawScreen);
+    }
+    return;
+  }
   var VU = e.vu;
   var scopes = e.scopes;
   var ctx;
 
-  if (e.scopes) {
+  if (e.scopes !== undefined) {
     // update VU meters & oscilliscopes
     var canvas = document.getElementById("vu");
     ctx = canvas.getContext("2d");
@@ -217,9 +220,8 @@ function redrawScreen() {
     shown_row = e.row;
   }
 
-  if (audio_events.length > 0) {
-    var next_event = audio_events[0].t;
-    setTimeout(redrawScreen, 1000*(next_event - player.audioctx.currentTime));
+  if (player.playing) {
+    window.requestAnimationFrame(redrawScreen);
   }
 }
 
@@ -291,6 +293,8 @@ function init() {
   shown_row = undefined;
   pat_canvas_patnum = undefined;
 
+  audio_events = [];
+  paused_events = [];
   audio_events.push({
     t: 0, row: 0, pat: player.xm.songpats[0],
     vu: new Float32Array(player.xm.nchan),
