@@ -9,7 +9,7 @@ if (!window.XMView) {
 var XMView = window.XMView;
 
 function loadXMAndInit(xmdata) {
-  if (!XMPlayer.loadXM(xmdata)) {
+  if (!XMPlayer.load(xmdata)) {
     return;
   }
 
@@ -19,10 +19,10 @@ function loadXMAndInit(xmdata) {
   playbutton.innerHTML='Play';
   playbutton.onclick = function() {
     if (XMPlayer.playing) {
-      XMPlayer.pauseXM();
+      XMPlayer.pause();
       playbutton.innerHTML='Play';
     } else {
-      XMPlayer.playXM();
+      XMPlayer.play();
       playbutton.innerHTML='Pause';
     }
   };
@@ -63,7 +63,7 @@ XMPlayer.handleDrop = function(e) {
   if (files.length < 1) return false;
   var reader = new FileReader();
   reader.onload = function(e) {
-    XMPlayer.stopXM();
+    XMPlayer.stop();
     loadXMAndInit(e.target.result);
   };
   reader.readAsArrayBuffer(files[0]);
@@ -78,7 +78,7 @@ function initFilelist() {
     a.href = '#'+entry[1];
     a.onclick = function() {
       el.style.display = "none";
-      XMPlayer.stopXM();
+      XMPlayer.stop();
       downloadXM(baseuri + entry[1]);
     };
     el.appendChild(a);
@@ -95,7 +95,7 @@ function initFilelist() {
 }
 
 window.onload = function() {
-  XMPlayer.initAudio();
+  XMPlayer.init();
   initFilelist();
 
   var uri = location.hash.substr(1);

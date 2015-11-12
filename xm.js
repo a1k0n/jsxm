@@ -11,11 +11,11 @@ var XMView = window.XMView;
 
 player.periodForNote = periodForNote;
 player.prettify_effect = prettify_effect;
-player.initAudio = initAudio;
-player.loadXM = loadXM;
-player.playXM = playXM;
-player.pauseXM = pauseXM;
-player.stopXM = stopXM;
+player.init = init;
+player.load = load;
+player.play = play;
+player.pause = pause;
+player.stop = stop;
 player.cur_songpos = -1;
 player.cur_pat = -1;
 player.cur_row = 64;
@@ -624,7 +624,7 @@ function UnrollSampleLoop(samp) {
   samp.type = 1;
 }
 
-function loadXM(arrayBuf) {
+function load(arrayBuf) {
   var dv = new DataView(arrayBuf);
   player.xm = {};
 
@@ -851,7 +851,7 @@ function loadXM(arrayBuf) {
 }
 
 var jsNode, gainNode;
-function initAudio() {
+function init() {
   if (!player.audioctx) {
     var audioContext = window.AudioContext || window.webkitAudioContext;
     player.audioctx = new audioContext();
@@ -868,7 +868,7 @@ function initAudio() {
 }
 
 player.playing = false;
-function playXM() {
+function play() {
   if (!player.playing) {
     // put paused events back into action, if any
     if (XMView.resume) XMView.resume();
@@ -891,7 +891,7 @@ function playXM() {
   player.playing = true;
 }
 
-function pauseXM() {
+function pause() {
   if (player.playing) {
     jsNode.disconnect(gainNode);
     if (XMView.pause) XMView.pause();
@@ -899,7 +899,7 @@ function pauseXM() {
   player.playing = false;
 }
 
-function stopXM() {
+function stop() {
   if (player.playing) {
     jsNode.disconnect(gainNode);
     player.playing = false;
@@ -909,6 +909,6 @@ function stopXM() {
   player.cur_songpos = -1;
   player.cur_ticksamp = 0;
   if (XMView.stop) XMView.stop();
-  initAudio();
+  init();
 }
 })(window);

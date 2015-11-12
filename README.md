@@ -9,13 +9,13 @@ FastTracker 2 .XM player, written for fun.
 There is an XM player and a visualizer which are separate components. The
 player API looks like this:
 
- - `XMPlayer.initAudio` -> starts up audio context; it's available as
+ - `XMPlayer.init` -> starts up audio context; it's available as
    `XMPlayer.audioctx`
- - `XMPlayer.loadXM(ArrayBuffer)` -> returns `true` if loaded, otherwise
+ - `XMPlayer.load(ArrayBuffer)` -> returns `true` if loaded, otherwise
    barfs randomly
- - `XMPlayer.playXM()` -> starts playing
- - `XMPlayer.pauseXM()` -> obvious
- - `XMPlayer.stopXM()` -> obvious; call this before loading a new one
+ - `XMPlayer.play()` -> starts playing
+ - `XMPlayer.pause()` -> obvious
+ - `XMPlayer.stop()` -> obvious; call this before loading a new one
 
 Loading trackview.js is optional; without it, the player won't do any
 visualizations. Or, you can override the following to get callbacks:
