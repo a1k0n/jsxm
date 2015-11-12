@@ -120,7 +120,7 @@ function eff_t0_c(ch, data) {  // set volume
 }
 
 function eff_t0_d(ch, data) {  // pattern jump
-  player.cur_songpos += 1;
+  player.cur_songpos++;
   if (player.cur_songpos >= player.xm.songpats.length)
     player.cur_songpos = player.xm.song_looppos;
   player.cur_pat = player.xm.songpats[player.cur_songpos];

@@ -297,14 +297,14 @@ function RedrawScreen() {
 function next_row() {
   if (player.cur_pat == -1 || player.cur_row >= player.xm.patterns[player.cur_pat].length) {
     player.cur_row = 0;
-    player.cur_songpos += 1;
+    player.cur_songpos++;
     if (player.cur_songpos >= player.xm.songpats.length)
       player.cur_songpos = player.xm.song_looppos;
     player.cur_pat = player.xm.songpats[player.cur_songpos];
   }
   var p = player.xm.patterns[player.cur_pat];
   var r = p[player.cur_row];
-  player.cur_row += 1;
+  player.cur_row++;
   for (var i = 0; i < r.length; i++) {
     var ch = player.xm.channelinfo[i];
     var inst = ch.inst;
@@ -473,7 +473,7 @@ EnvelopeFollower.prototype.Tick = function(release) {
 }
 
 function next_tick() {
-  player.cur_tick += 1;
+  player.cur_tick++;
   if (player.cur_tick >= player.xm.tempo) {
     player.cur_tick = 0;
     next_row();
