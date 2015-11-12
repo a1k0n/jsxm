@@ -155,7 +155,7 @@ function eff_t0_e(ch, data) {  // extended effects!
     case 0x0c:  // note cut handled in eff_t1_e
       break;
     default:
-      console.log("unimplemented extended effect E", ch.effect.toString(16));
+      console.log("unimplemented extended effect E", ch.effectdata.toString(16));
       break;
   }
 }
@@ -293,4 +293,5 @@ player.effects_t1 = [  // effect functions on tick 1+
   eff_unimplemented,  // y
   eff_unimplemented   // z
 ];
+
 })(window || {});
