@@ -9,7 +9,7 @@ if (!window.XMView) {
 }
 var XMView = window.XMView;
 
-player.PeriodForNote = PeriodForNote;
+player.periodForNote = periodForNote;
 player.prettify_effect = prettify_effect;
 player.initAudio = initAudio;
 player.loadXM = loadXM;
@@ -23,12 +23,20 @@ player.cur_ticksamp = 0;
 player.cur_tick = 6;
 player.xm = {};  // contains all song data
 
+// exposed for testing
+player.nextTick = nextTick;
+player.Envelope = Envelope;
+
 // for pretty-printing notes
 var _note_names = [
   "C-", "C#", "D-", "D#", "E-", "F-",
   "F#", "G-", "G#", "A-", "A#", "B-"];
 
 var f_smp = 44100;  // updated by play callback, default value here
+
+// per-sample exponential moving average for volume changes (to prevent pops
+// and clicks); evaluated every 8 samples
+var popfilter_alpha = 0.9837;
 
 function prettify_note(note) {
   if (note < 0) return "---";
@@ -72,7 +80,7 @@ function getstring(dv, offset, len) {
 
 // Return 2-pole Butterworth lowpass filter coefficients for
 // center frequncy f_c (relative to sampling frequency)
-function FilterCoeffs(f_c) {
+function filterCoeffs(f_c) {
   if (f_c > 0.5) {  // we can't lowpass above the nyquist frequency...
     f_c = 0.5;
   }
@@ -84,24 +92,21 @@ function FilterCoeffs(f_c) {
   return [gain, 2*c, -c*c - s*s];
 }
 
-popfilter = FilterCoeffs(200.0 / 44100.0);
-popfilter_alpha = 0.9837;
-
-function UpdateChannelPeriod(ch, period) {
+function updateChannelPeriod(ch, period) {
   var freq = 8363 * Math.pow(2, (1152.0 - period) / 192.0);
   if (isNaN(freq)) {
     console.log("invalid period!", period);
     return;
   }
   ch.doff = freq / f_smp;
-  ch.filter = FilterCoeffs(ch.doff / 2);
+  ch.filter = filterCoeffs(ch.doff / 2);
 }
 
-function PeriodForNote(ch, note) {
+function periodForNote(ch, note) {
   return 1920 - (note + ch.samp.note)*16 - ch.samp.fine / 8.0;
 }
 
-function next_row() {
+function nextRow() {
   if (player.cur_pat == -1 || player.cur_row >= player.xm.patterns[player.cur_pat].length) {
     player.cur_row = 0;
     player.cur_songpos++;
@@ -196,7 +201,7 @@ function next_row() {
     // special handling for portamentos: don't trigger the note
     if (ch.effect == 3 || ch.effect == 5) {
       if (r[i][0] != -1) {
-        ch.periodtarget = PeriodForNote(ch, ch.note);
+        ch.periodtarget = periodForNote(ch, ch.note);
       }
       triggernote = false;
       if (inst && inst.samplemap) {
@@ -224,7 +229,7 @@ function next_row() {
       ch.env_vol = new EnvelopeFollower(inst.env_vol);
       ch.env_pan = new EnvelopeFollower(inst.env_pan);
       if (ch.note != undefined) {
-        ch.period = PeriodForNote(ch, ch.note);
+        ch.period = periodForNote(ch, ch.note);
       }
     }
   }
@@ -279,11 +284,11 @@ EnvelopeFollower.prototype.Tick = function(release) {
   return value;
 };
 
-function next_tick() {
+function nextTick() {
   player.cur_tick++;
   if (player.cur_tick >= player.xm.tempo) {
     player.cur_tick = 0;
-    next_row();
+    nextRow();
   }
   for (var j = 0; j < player.xm.nchan; j++) {
     var ch = player.xm.channelinfo[j];
@@ -305,7 +310,7 @@ function next_tick() {
     }
     ch.volE = ch.env_vol.Tick(ch.release);
     ch.panE = ch.env_pan.Tick(ch.release);
-    UpdateChannelPeriod(ch, ch.period + ch.periodoffset);
+    updateChannelPeriod(ch, ch.period + ch.periodoffset);
   }
 }
 
@@ -386,7 +391,7 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   var i = start;
   var failsafe = 100;
   while (i < end) {
-    if (failsafe-- == 0) {
+    if (failsafe-- === 0) {
       console.log("failsafe in mixing loop! channel", ch.number, k, sample_end,
           loopstart, looplen, dk);
       break;
@@ -518,7 +523,7 @@ function audio_cb(e) {
 
   while(buflen > 0) {
     if (player.cur_pat == -1 || player.cur_ticksamp >= ticklen) {
-      next_tick(f_smp);
+      nextTick(f_smp);
       player.cur_ticksamp -= ticklen;
     }
     var tickduration = Math.min(buflen, ticklen - player.cur_ticksamp);
