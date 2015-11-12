@@ -1271,4 +1271,4 @@ window.onload = function() {
   }
   DownloadXM(uri);
 }
-})(window, document);
+})(window || {}, document);
