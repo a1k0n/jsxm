@@ -107,13 +107,37 @@ function periodForNote(ch, note) {
   return 1920 - (note + ch.samp.note)*16 - ch.samp.fine / 8.0;
 }
 
+function setCurrentPattern() {
+  var nextPat = player.xm.songpats[player.cur_songpos];
+
+  // check for out of range pattern index
+  while (nextPat >= player.xm.patterns.length) {
+    if (player.cur_songpos + 1 < player.xm.songpats.length) {
+      // first try skipping the position
+      player.cur_songpos++;
+    } else if ((player.cur_songpos === player.xm.song_looppos && player.cur_songpos !== 0)
+      || player.xm.song_looppos >= player.xm.songpats.length) {
+      // if we allready tried song_looppos or if song_looppos
+      // is out of range, go to the first position
+      player.cur_songpos = 0;
+    } else {
+      // try going to song_looppos
+      player.cur_songpos = player.xm.song_looppos;
+    }
+
+    nextPat = player.xm.songpats[player.cur_songpos];
+  }
+
+  player.cur_pat = nextPat;
+}
+
 function nextRow() {
   if (player.cur_pat == -1 || player.cur_row >= player.xm.patterns[player.cur_pat].length) {
     player.cur_row = 0;
     player.cur_songpos++;
     if (player.cur_songpos >= player.xm.songpats.length)
       player.cur_songpos = player.xm.song_looppos;
-    player.cur_pat = player.xm.songpats[player.cur_songpos];
+    setCurrentPattern();
   }
   var p = player.xm.patterns[player.cur_pat];
   var r = p[player.cur_row];
