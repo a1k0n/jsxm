@@ -22,6 +22,7 @@ player.cur_row = 64;
 player.cur_ticksamp = 0;
 player.cur_tick = 6;
 player.xm = {};  // contains all song data
+player.xm.global_volume = player.max_global_volume = 128;
 
 // exposed for testing
 player.nextTick = nextTick;
@@ -369,8 +370,8 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
   var volE = ch.volE / 64.0;    // current volume envelope
   var panE = 4*(ch.panE - 32);  // current panning envelope
   var p = panE + ch.pan - 128;  // final pan
-  var volL = volE * (128 - p) * ch.vol / 8192.0;
-  var volR = volE * (128 + p) * ch.vol / 8192.0;
+  var volL = player.xm.global_volume * volE * (128 - p) * ch.vol / (64 * 128 * 128);
+  var volR = player.xm.global_volume * volE * (128 + p) * ch.vol / (64 * 128 * 128);
   if (volL < 0) volL = 0;
   if (volR < 0) volR = 0;
   if (volR === 0 && volL === 0)
@@ -645,6 +646,7 @@ function load(arrayBuf) {
   player.xm.tempo = dv.getUint16(0x4c, true);
   player.xm.bpm = dv.getUint16(0x4e, true);
   player.xm.channelinfo = [];
+  player.xm.global_volume = player.max_global_volume;
 
   var i, j, k;
 
@@ -915,6 +917,7 @@ function stop() {
   player.cur_row = 64;
   player.cur_songpos = -1;
   player.cur_ticksamp = 0;
+  player.xm.global_volume = player.max_global_volume;
   if (XMView.stop) XMView.stop();
   init();
 }
