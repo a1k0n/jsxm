@@ -1,11 +1,14 @@
 var XMPlayer = window.XMPlayer;
 
-// TODO:
-//  - portamento 3xx
-//  - vibrato 4xy
-//  - volume slide Axy
-//  - porta+vol 5xy
-//  - etc etc
+// tests TODO:
+//  - bxx: song jump
+//  - dxx: pattern jump
+//  - rxy: retrigger w/ volume changes
+// low priority TODO (trivial or already covered by other tests):
+//  - 5xy: porta+vol
+//  - 6xy: vibrato+vol
+//  - 8xx: panning
+//  - 9xx: sample offset
 
 exports['test 0xy arpeggio'] = function(assert) {
   var xm = testdata.resetXMData();
@@ -204,7 +207,6 @@ exports['test Axy volume slide'] = function(assert) {
 exports['test Gxx global volume'] = function(assert) {
   var xm = testdata.resetXMData();
   // [pat][row][channel]
-  // 1 channel, 3 row blank pattern
   xm.patterns = [
     [
       [[48, 1, -1, 16, 0x40]], // C-4  1 -- G40
@@ -222,4 +224,27 @@ exports['test Gxx global volume'] = function(assert) {
   assert.equal(XMPlayer.xm.global_volume, 0x2B*2, 'global volume set to 0x2B');
   XMPlayer.nextTick();
   assert.equal(XMPlayer.xm.global_volume, 0x40*2, 'global volume set to 0x40');
+};
+
+exports['test E5x finetune override'] = function(assert) {
+  var xm = testdata.resetXMData();
+  // [pat][row][channel]
+  xm.instruments[0].samples[0].fine = -4;
+  xm.patterns = [
+    [
+      [[48, 1, -1,  0, 0x00]], // C-4  1 -- 000  (sample finetune -4)
+      [[48, 1, -1, 14, 0x50]], // C-4  1 -- E50  (finetune -128)
+      [[48, 1, -1, 14, 0x5f]]  // C-4  1 -- E5f  (finetune +127)
+    ]
+  ];
+  xm.tempo = 1;
+  var ch = xm.channelinfo[0];
+  XMPlayer.nextTick();
+  var f0 = ch.doff;
+  XMPlayer.nextTick();
+  var f1 = 12 * 128 * Math.log(ch.doff / f0) / Math.log(2);
+  assert.equal(f1.toFixed(2), "-124.00", "E50 finetune -128");
+  XMPlayer.nextTick();
+  var f2 = 12 * 128 * Math.log(ch.doff / f0) / Math.log(2);
+  assert.equal(f2.toFixed(2), "131.00", "E50 finetune +127");
 };

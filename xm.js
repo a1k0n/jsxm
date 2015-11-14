@@ -105,7 +105,7 @@ function updateChannelPeriod(ch, period) {
 }
 
 function periodForNote(ch, note) {
-  return 1920 - (note + ch.samp.note)*16 - ch.samp.fine / 8.0;
+  return 1920 - (note + ch.samp.note)*16 - ch.fine / 8.0;
 }
 
 function setCurrentPattern() {
@@ -158,6 +158,7 @@ function nextRow() {
           ch.samp = inst.samples[inst.samplemap[ch.note]];
           ch.vol = ch.samp.vol;
           ch.pan = ch.samp.pan;
+          ch.fine = ch.samp.fine;
         }
       } else {
         // console.log("invalid inst", r[i][1], instruments.length);
@@ -179,6 +180,7 @@ function nextRow() {
             // (potentially) new sample
             ch.pan = ch.samp.pan;
             ch.vol = ch.samp.vol;
+            ch.fine = ch.samp.fine;
           }
           triggernote = true;
         }
