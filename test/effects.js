@@ -90,7 +90,6 @@ exports['test 4xy vibrato'] = function(assert) {
   var xm = testdata.resetXMData();
   // vibrato 4xy: speed x, depth y
   // full cycle is 64/speed
-  // [pat][row][channel]
   xm.patterns[0] = [
     [[48,  1, -1, 4, 0x81]],  // C-4  1 -- 481
     [[-1, -1, -1, 4, 0x02]],  // --- -- -- 402
@@ -206,7 +205,6 @@ exports['test Axy volume slide'] = function(assert) {
 
 exports['test Gxx global volume'] = function(assert) {
   var xm = testdata.resetXMData();
-  // [pat][row][channel]
   xm.patterns = [
     [
       [[48, 1, -1, 16, 0x40]], // C-4  1 -- G40
@@ -228,7 +226,7 @@ exports['test Gxx global volume'] = function(assert) {
 
 exports['test E5x finetune override'] = function(assert) {
   var xm = testdata.resetXMData();
-  // [pat][row][channel]
+  // set an initial finetune so we know we're overriding it...
   xm.instruments[0].samples[0].fine = -4;
   xm.patterns = [
     [
@@ -242,9 +240,10 @@ exports['test E5x finetune override'] = function(assert) {
   XMPlayer.nextTick();
   var f0 = ch.doff;
   XMPlayer.nextTick();
+  // compare frequency relative to original finetune -4 note
   var f1 = 12 * 128 * Math.log(ch.doff / f0) / Math.log(2);
   assert.equal(f1.toFixed(2), "-124.00", "E50 finetune -128");
   XMPlayer.nextTick();
   var f2 = 12 * 128 * Math.log(ch.doff / f0) / Math.log(2);
-  assert.equal(f2.toFixed(2), "131.00", "E50 finetune +127");
+  assert.equal(f2.toFixed(2), "131.00", "E5f finetune +127");
 };
