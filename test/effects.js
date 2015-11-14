@@ -200,3 +200,26 @@ exports['test Axy volume slide'] = function(assert) {
   XMPlayer.nextTick();  // tick 2
   assert.equal(ch.vol, 32, 'row 3 tick 2 vol 32');
 };
+
+exports['test Gxx global volume'] = function(assert) {
+  var xm = testdata.resetXMData();
+  // [pat][row][channel]
+  // 1 channel, 3 row blank pattern
+  xm.patterns = [
+    [
+      [[48, 1, -1, 16, 0x40]], // C-4  1 -- G40
+      [[48, 1, -1, 16, 0x2B]], // C-4  1 -- G2B
+      // test out of bounds volume
+      [[48, 1, -1, 16, 0x80]]  // C-4  1 -- G80
+    ]
+  ];
+  XMPlayer.xm.tempo = 1;
+  XMPlayer.nextTick();
+  // volume gets multiplied by 2 to match
+  // the initial max global volume of 128
+  assert.equal(XMPlayer.xm.global_volume, 0x40*2, 'global volume set to 0x40');
+  XMPlayer.nextTick();
+  assert.equal(XMPlayer.xm.global_volume, 0x2B*2, 'global volume set to 0x2B');
+  XMPlayer.nextTick();
+  assert.equal(XMPlayer.xm.global_volume, 0x40*2, 'global volume set to 0x40');
+};

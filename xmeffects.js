@@ -178,6 +178,16 @@ function eff_t0_f(ch, data) {  // set tempo
   }
 }
 
+function eff_t0_g(ch, data) {  // set global volume
+  if (data <= 0x40) {
+    // volume gets multiplied by 2 to match
+    // the initial max global volume of 128
+    player.xm.global_volume = Math.max(0, data * 2);
+  } else {
+    player.xm.global_volume = player.max_global_volume;
+  }
+}
+
 function eff_t0_r(ch, data) {  // retrigger
   if (data & 0x0f) ch.retrig = (ch.retrig & 0xf0) + (data & 0x0f);
   if (data & 0xf0) ch.retrig = (ch.retrig & 0x0f) + (data & 0xf0);
@@ -230,7 +240,7 @@ player.effects_t0 = [  // effect functions on tick 0
   eff_t0_d,  // d
   eff_t0_e,  // e
   eff_t0_f,  // f
-  eff_unimplemented_t0,  // g
+  eff_t0_g,  // g
   eff_unimplemented_t0,  // h
   eff_unimplemented_t0,  // i
   eff_unimplemented_t0,  // j
@@ -269,7 +279,7 @@ player.effects_t1 = [  // effect functions on tick 1+
   null,   // d
   eff_t1_e,  // e
   null,   // f
-  eff_unimplemented,  // g
+  null,  // g
   eff_unimplemented,  // h
   eff_unimplemented,  // i
   eff_unimplemented,  // j
