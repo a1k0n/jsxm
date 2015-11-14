@@ -61,13 +61,14 @@ function eff_t0_4(ch, data) {  // vibrato
   if (data >> 4) {
     ch.vibratospeed = data >> 4;
   }
-  eff_t1_4(ch, data);
+  eff_t1_4(ch);
 }
 
 function eff_t1_4(ch) {  // vibrato
   ch.periodoffset = Math.sin(ch.vibratopos * Math.PI / 32) * ch.vibratodepth;
   if (isNaN(ch.periodoffset)) {
-    console.log("vibrato periodoffset NaN?", ch.vibratopos, ch.vibratodepth);
+    console.log("vibrato periodoffset NaN?",
+        ch.vibratopos, ch.vibratospeed, ch.vibratodepth);
     ch.periodoffset = 0;
   }
   ch.vibratopos += ch.vibratospeed;

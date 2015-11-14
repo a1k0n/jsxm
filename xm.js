@@ -226,10 +226,9 @@ function nextRow() {
       if (ch.effect != 9) ch.off = 0;
       ch.release = 0;
       ch.envtick = 0;
-      ch.vibratopos = 0;
       ch.env_vol = new EnvelopeFollower(inst.env_vol);
       ch.env_pan = new EnvelopeFollower(inst.env_pan);
-      if (ch.note != undefined) {
+      if (ch.note) {
         ch.period = periodForNote(ch, ch.note);
       }
     }
@@ -287,25 +286,31 @@ EnvelopeFollower.prototype.Tick = function(release) {
 
 function nextTick() {
   player.cur_tick++;
+  var j, ch;
+  for (j = 0; j < player.xm.nchan; j++) {
+    ch = player.xm.channelinfo[j];
+    ch.periodoffset = 0;
+  }
   if (player.cur_tick >= player.xm.tempo) {
     player.cur_tick = 0;
     nextRow();
   }
-  for (var j = 0; j < player.xm.nchan; j++) {
-    var ch = player.xm.channelinfo[j];
+  for (j = 0; j < player.xm.nchan; j++) {
+    ch = player.xm.channelinfo[j];
     var inst = ch.inst;
-    ch.periodoffset = 0;
-    if (player.cur_tick != 0) {
+    if (player.cur_tick !== 0) {
       if(ch.voleffectfn) ch.voleffectfn(ch);
       if(ch.effectfn) ch.effectfn(ch);
     }
     if (isNaN(ch.period)) {
-      console.log(prettify_notedata(player.xm.patterns[player.cur_pat][player.cur_row-1][j]),
+      console.log(prettify_notedata(
+            player.xm.patterns[player.cur_pat][player.cur_row-1][j]),
           "set channel", j, "period to NaN");
     }
-    if (inst == undefined) continue;
-    if (ch.env_vol == undefined) {
-      console.log(prettify_notedata(player.xm.patterns[player.cur_pat][player.cur_row-1][j]),
+    if (inst === undefined) continue;
+    if (ch.env_vol === undefined) {
+      console.log(prettify_notedata(
+            player.xm.patterns[player.cur_pat][player.cur_row-1][j]),
           "set channel", j, "env_vol to undefined, but note is playing");
       continue;
     }
@@ -655,6 +660,7 @@ function load(arrayBuf) {
       mute: 0,
       volE: 0, panE: 0,
       retrig: 0,
+      vibratopos: 0,
       vibratodepth: 1,
       vibratospeed: 1,
     });

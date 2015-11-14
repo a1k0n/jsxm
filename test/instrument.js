@@ -4,7 +4,7 @@ var XMPlayer = window.XMPlayer;
 //  - test volume envelope (sustain, release)
 //  - test panning envelope
 
-tests['test note on'] = function(assert) {
+exports['test note on'] = function(assert) {
   var xm = testdata.resetXMData();
   // [pat][row][channel]
   xm.patterns[0][0][0] = [48, 1, 0x10 + 0x33, 0, 0];  // C-4  1 33 000
@@ -17,7 +17,7 @@ tests['test note on'] = function(assert) {
   assert.equal(ch.off, 0, 'trigger offset');
 };
 
-tests['test instrument trigger'] = function(assert) {
+exports['test instrument trigger'] = function(assert) {
   var xm = testdata.resetXMData();
   // [pat][row][channel]
   xm.patterns[0][0][0] = [48, 1, 0x10 + 0x33, 0, 0];  // C-4  1 33 000
@@ -37,7 +37,7 @@ tests['test instrument trigger'] = function(assert) {
   assert.equal(ch.off, 0, 'set offset=0');
 };
 
-tests['test note trigger'] = function(assert) {
+exports['test note trigger'] = function(assert) {
   var xm = testdata.resetXMData();
   // [pat][row][channel]
   xm.patterns[0][0][0] = [48, 1, 0x10 + 0x33, 0, 0];  // C-4  1 33 000

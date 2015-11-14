@@ -22,6 +22,7 @@ exports.resetXMData = function() {
     mute: 0,
     volE: 0, panE: 0,
     retrig: 0,
+    vibratopos: 0,
     vibratodepth: 1,
     vibratospeed: 1,
   });

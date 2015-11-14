@@ -7,7 +7,7 @@ var XMPlayer = window.XMPlayer;
 //  - porta+vol 5xy
 //  - etc etc
 
-tests['test 0xy arpeggio'] = function(assert) {
+exports['test 0xy arpeggio'] = function(assert) {
   var xm = testdata.resetXMData();
   // [pat][row][channel]
   xm.patterns[0][0][0] = [48, 1, -1, 0, 0x4f];  // C-4  1 -- 04f
@@ -26,7 +26,7 @@ tests['test 0xy arpeggio'] = function(assert) {
   assert.equal(ch.period, 1152 - 16*0, 'row 1 tick 0 period 0');
 };
 
-tests['test 1xx slide up'] = function(assert) {
+exports['test 1xx slide up'] = function(assert) {
   var xm = testdata.resetXMData();
   // [pat][row][channel]
   xm.patterns[0][0][0] = [48,  1, -1, 1, 0x01];  // C-4  1 -- 101
@@ -45,7 +45,7 @@ tests['test 1xx slide up'] = function(assert) {
   assert.equal(ch.period, 1152 - 3, 'row 1 tick 1 period -3');
 };
 
-tests['test 2xx slide down'] = function(assert) {
+exports['test 2xx slide down'] = function(assert) {
   var xm = testdata.resetXMData();
   // [pat][row][channel]
   xm.patterns[0][0][0] = [48,  1, -1, 2, 0x01];  // C-4  1 -- 201
@@ -55,16 +55,16 @@ tests['test 2xx slide down'] = function(assert) {
   var ch = xm.channelinfo[0];
   assert.equal(ch.period, 1152, 'row 0 tick 0 period 0');
   XMPlayer.nextTick();
-  assert.equal(ch.period, 1152 + 1, 'row 0 tick 1 period -1');
+  assert.equal(ch.period, 1152 + 1, 'row 0 tick 1 period +1');
   XMPlayer.nextTick();
-  assert.equal(ch.period, 1152 + 2, 'row 0 tick 2 period -2');
+  assert.equal(ch.period, 1152 + 2, 'row 0 tick 2 period +2');
   XMPlayer.nextTick();
-  assert.equal(ch.period, 1152 + 2, 'row 1 tick 0 period -2');
+  assert.equal(ch.period, 1152 + 2, 'row 1 tick 0 period +2');
   XMPlayer.nextTick();
-  assert.equal(ch.period, 1152 + 3, 'row 1 tick 1 period -3');
+  assert.equal(ch.period, 1152 + 3, 'row 1 tick 1 period +3');
 };
 
-tests['test 3xx portamento'] = function(assert) {
+exports['test 3xx portamento'] = function(assert) {
   var xm = testdata.resetXMData();
   // [pat][row][channel]
   xm.patterns[0][0][0] = [48,  1, -1, 0, 0x00];  // C-4  1 -- 000
@@ -81,5 +81,74 @@ tests['test 3xx portamento'] = function(assert) {
   assert.equal(ch.period, 1152 - 9, 'row 1 tick 1 period -9');
   XMPlayer.nextTick();
   assert.equal(ch.period, 1152 - 16, 'row 1 tick 2 period -16');
+};
+
+exports['test 4xy vibrato'] = function(assert) {
+  var xm = testdata.resetXMData();
+  // vibrato 4xy: speed x, depth y
+  // full cycle is 64/speed
+  // [pat][row][channel]
+  xm.patterns[0] = [
+    [[48,  1, -1, 4, 0x81]],  // C-4  1 -- 481
+    [[-1, -1, -1, 4, 0x02]],  // --- -- -- 402
+    [[-1, -1, -1, 4, 0x10]],  // --- -- -- 410
+    [[-1, -1, -1, 4, 0x00]],  // --- -- -- 400
+    [[-1, -1, -1, 0, 0x00]],  // --- -- -- 000 - no vibrato
+    [[-1, -1, -1, 4, 0x00]],  // --- -- -- 400 - resume vibrato @ pos 0
+  ];
+  // I should really be testing ch.doff directly
+  XMPlayer.xm.tempo = 3;
+  var ch = xm.channelinfo[0];
+  XMPlayer.nextTick();  // row 0 tick 0
+  var p0 = ch.doff;
+  assert.equal(ch.periodoffset, 0, 'row 0 tick 0 periodoffset=0');
+  XMPlayer.nextTick();  // row 0 tick 1
+  // compute logical period p from actual play frequency
+  var p = 16*12 * Math.log(p0 / ch.doff) / Math.log(2);
+  assert.equal(p.toFixed(3), "0.707", 'row 0 tick 1 period +0.707');
+  XMPlayer.nextTick();  // row 0 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "1.000", 'row 0 tick 2 period +1.000');
+  XMPlayer.nextTick();  // row 1 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "1.414", 'row 1 tick 0 period +1.414');
+  XMPlayer.nextTick();  // row 1 tick 1
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "0.000", 'row 1 tick 1 period +0');
+  XMPlayer.nextTick();  // row 1 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.414", 'row 1 tick 2 period -1.414');
+  XMPlayer.nextTick();  // row 2 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-2.000", 'row 2 tick 0 period -2.000');
+  XMPlayer.nextTick();  // row 2 tick 1
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.990", 'row 2 tick 1 period -1.990');
+  XMPlayer.nextTick();  // row 2 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.962", 'row 2 tick 2 period -1.962');
+  XMPlayer.nextTick();  // row 3 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.914", 'row 3 tick 0 period -1.914');
+  XMPlayer.nextTick();  // row 3 tick 1
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.848", 'row 3 tick 1 period -1.848');
+  XMPlayer.nextTick();  // row 3 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.764", 'row 3 tick 2 period -1.764');
+  XMPlayer.nextTick();  // row 4 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "0.000", 'row 4 tick 0 period 0 - no vibrato');
+  XMPlayer.nextTick();  // row 4 tick 1
+  XMPlayer.nextTick();  // row 4 tick 2
+  // I actually don't know whether vibrato is supposed to reset when the effect
+  // goes away or whether it should resume. Resuming is simpler to implement so
+  // that's what I'm assuming here...
+  XMPlayer.nextTick();  // row 5 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.663", 'row 5 tick 0 period -1.663 - vibrato resume');
+  XMPlayer.nextTick();  // row 5 tick 1
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.546", 'row 5 tick 1 period -1.546');
 };
 
