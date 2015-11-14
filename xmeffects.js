@@ -5,7 +5,7 @@ if (!window.XMPlayer) {
 var player = window.XMPlayer;
 
 function eff_t1_0(ch) {  // arpeggio
-  if (ch.effectdata != 0 && ch.inst != undefined) {
+  if (ch.effectdata !== 0 && ch.inst !== undefined) {
     var arpeggio = [0, ch.effectdata>>4, ch.effectdata&15];
     var note = ch.note + arpeggio[player.cur_tick % 3];
     ch.period = player.periodForNote(ch, note);
@@ -13,7 +13,7 @@ function eff_t1_0(ch) {  // arpeggio
 }
 
 function eff_t0_1(ch, data) {  // pitch slide up
-  if (data != 0) {
+  if (data !== 0) {
     ch.slideupspeed = data;
   }
 }
@@ -26,7 +26,7 @@ function eff_t1_1(ch) {  // pitch slide up
 }
 
 function eff_t0_2(ch, data) {  // pitch slide down
-  if (data != 0) {
+  if (data !== 0) {
     ch.slidedownspeed = data;
   }
 }
@@ -39,7 +39,7 @@ function eff_t1_2(ch) {  // pitch slide down
 }
 
 function eff_t0_3(ch, data) {  // portamento
-  if (data != 0) {
+  if (data !== 0) {
     ch.portaspeed = data;
   }
 }
@@ -138,13 +138,13 @@ function eff_t0_e(ch, data) {  // extended effects!
       ch.pan = data * 0x11;
       break;
     case 0x0a:  // fine vol slide up (with memory)
-      if (data == 0 && ch.finevolup != undefined)
+      if (data === 0 && ch.finevolup !== undefined)
         data = ch.finevolup;
       ch.vol = Math.min(64, ch.vol + data);
       ch.finevolup = data;
       break;
     case 0x0b:  // fine vol slide down
-      if (data == 0 && ch.finevoldown != undefined)
+      if (data === 0 && ch.finevoldown !== undefined)
         data = ch.finevoldown;
       ch.vol = Math.max(0, ch.vol - data);
       ch.finevoldown = data;
@@ -168,7 +168,7 @@ function eff_t1_e(ch) {  // note cut
 }
 
 function eff_t0_f(ch, data) {  // set tempo
-  if (data == 0) {
+  if (data === 0) {
     console.log("tempo 0?");
     return;
   } else if (data < 0x20) {
@@ -203,7 +203,7 @@ function eff_t0_r(ch, data) {  // retrigger
 }
 
 function eff_t1_r(ch) {
-  if (player.cur_tick % (ch.retrig & 0x0f) == 0) {
+  if (player.cur_tick % (ch.retrig & 0x0f) === 0) {
     ch.off = 0;
   }
 }
