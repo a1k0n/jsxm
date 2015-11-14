@@ -52,6 +52,6 @@ exports.resetXMData = function() {
   // reset song position
   XMPlayer.cur_songpos = -1;
   XMPlayer.cur_pat = -1;
-  XMPlayer.cur_tick = xm.tempo;
+  XMPlayer.cur_tick = 64;
   return xm;
 };

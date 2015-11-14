@@ -152,3 +152,51 @@ exports['test 4xy vibrato'] = function(assert) {
   assert.equal(p.toFixed(3), "-1.546", 'row 5 tick 1 period -1.546');
 };
 
+exports['test Axy volume slide'] = function(assert) {
+  var xm = testdata.resetXMData();
+  XMPlayer.xm.tempo = 6;
+
+  xm.patterns[0] = [
+    [[48,  1, -1, 10, 0x0f]],  // C-4  1 -- A0f (slide down)
+    [[-1, -1, -1, 10, 0x90]],  // --- -- -- A90 (slide up)
+    [[-1, -1, -1, 10, 0x00]],  // --- -- -- A00 (continue same)
+    [[-1, -1, 0x30, 10, 0x11]],  // --- -- 20 A11 (invalid, do nothing)
+  ];
+  var ch = xm.channelinfo[0];
+  XMPlayer.nextTick();
+  assert.equal(ch.vol, 64, 'row 0 tick 0 vol 64');
+  XMPlayer.nextTick();
+  assert.equal(ch.vol, 49, 'row 0 tick 1 vol 49');
+  XMPlayer.nextTick();
+  assert.equal(ch.vol, 34, 'row 0 tick 2 vol 34');
+  XMPlayer.nextTick();
+  assert.equal(ch.vol, 19, 'row 0 tick 3 vol 19');
+  XMPlayer.nextTick();
+  assert.equal(ch.vol, 4, 'row 0 tick 4 vol 4');
+  XMPlayer.nextTick();
+  assert.equal(ch.vol, 0, 'row 0 tick 5 vol 0');
+  XMPlayer.nextTick();
+  assert.equal(ch.vol, 0, 'row 1 tick 0 vol 0');
+  XMPlayer.nextTick();
+  assert.equal(ch.vol, 9, 'row 1 tick 1 vol 9');
+  XMPlayer.nextTick();  // row 1 tick 2
+  XMPlayer.nextTick();  // tick 3
+  XMPlayer.nextTick();  // tick 4
+  XMPlayer.nextTick();  // tick 5
+  assert.equal(ch.vol, 45, 'row 1 tick 5 vol 45');
+  XMPlayer.nextTick();  // row 2 tick 0
+  assert.equal(ch.vol, 45, 'row 2 tick 0 vol 45');
+  XMPlayer.nextTick();  // row 2 tick 1
+  assert.equal(ch.vol, 54, 'row 2 tick 1 vol 54');
+  XMPlayer.nextTick();  // tick 2
+  XMPlayer.nextTick();  // tick 3
+  assert.equal(ch.vol, 64, 'row 2 tick 3 vol 64');
+  XMPlayer.nextTick();  // tick 4
+  XMPlayer.nextTick();  // tick 5
+  XMPlayer.nextTick();  // row 3 tick 0
+  assert.equal(ch.vol, 32, 'row 3 tick 0 vol 32');
+  XMPlayer.nextTick();  // tick 1
+  assert.equal(ch.vol, 32, 'row 3 tick 1 vol 32');
+  XMPlayer.nextTick();  // tick 2
+  assert.equal(ch.vol, 32, 'row 3 tick 2 vol 32');
+};
