@@ -6,6 +6,7 @@
   "uri": "http://www.a1k0n.net/code/jsxm/",
   "repository": "a1k0n/jsxm",
   "author": "Andy Sloane <andy@a1k0n.net> (http://www.a1k0n.net/)",
+  "license": "MIT",
 
   "main": "index.html",
   "window": {
