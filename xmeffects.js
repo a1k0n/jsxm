@@ -191,6 +191,20 @@ function eff_t0_g(ch, data) {  // set global volume
   }
 }
 
+function eff_t0_h(ch, data) {  // global volume slide
+  if (data) {
+    // same as Axy but multiplied by 2
+    player.xm.global_volumeslide = (-(data & 0x0f) + (data >> 4)) * 2;
+  }
+}
+
+function eff_t1_h(ch) {  // global volume slide
+  if (player.xm.global_volumeslide !== undefined) {
+    player.xm.global_volume = Math.max(0, Math.min(player.max_global_volume,
+      player.xm.global_volume + player.xm.global_volumeslide));
+  }
+}
+
 function eff_t0_r(ch, data) {  // retrigger
   if (data & 0x0f) ch.retrig = (ch.retrig & 0xf0) + (data & 0x0f);
   if (data & 0xf0) ch.retrig = (ch.retrig & 0x0f) + (data & 0xf0);
@@ -244,7 +258,7 @@ player.effects_t0 = [  // effect functions on tick 0
   eff_t0_e,  // e
   eff_t0_f,  // f
   eff_t0_g,  // g
-  eff_unimplemented_t0,  // h
+  eff_t0_h,  // h
   eff_unimplemented_t0,  // i
   eff_unimplemented_t0,  // j
   eff_unimplemented_t0,  // k
@@ -283,7 +297,7 @@ player.effects_t1 = [  // effect functions on tick 1+
   eff_t1_e,  // e
   null,   // f
   null,  // g
-  eff_unimplemented,  // h
+  eff_t1_h,  // h
   eff_unimplemented,  // i
   eff_unimplemented,  // j
   eff_unimplemented,  // k

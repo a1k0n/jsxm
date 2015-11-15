@@ -224,6 +224,55 @@ exports['test Gxx global volume'] = function(assert) {
   assert.equal(XMPlayer.xm.global_volume, 0x40*2, 'global volume set to 0x40');
 };
 
+exports['test Hxy global volume slide'] = function(assert) {
+  var xm = testdata.resetXMData();
+  xm.tempo = 6;
+  xm.global_volume = 128;
+
+  xm.patterns[0] = [
+    [[48,  1, -1, 17, 0x0f]],  // C-4  1 -- H0f (slide down)
+    [[-1, -1, -1, 17, 0x90]],  // --- -- -- H90 (slide up)
+    [[-1, -1, -1, 17, 0x00]],  // --- -- -- H00 (continue same)
+    [[-1, -1, 0x30, 17, 0x11]],  // --- -- 30 H11 (invalid, do nothing)
+  ];
+  XMPlayer.nextTick();
+  assert.equal(xm.global_volume, 128, 'row 0 tick 0 vol 128');
+  XMPlayer.nextTick();
+  assert.equal(xm.global_volume, 98, 'row 0 tick 1 vol 98');
+  XMPlayer.nextTick();
+  assert.equal(xm.global_volume, 68, 'row 0 tick 2 vol 68');
+  XMPlayer.nextTick();
+  assert.equal(xm.global_volume, 38, 'row 0 tick 3 vol 38');
+  XMPlayer.nextTick();
+  assert.equal(xm.global_volume, 8, 'row 0 tick 4 vol 8');
+  XMPlayer.nextTick();
+  assert.equal(xm.global_volume, 0, 'row 0 tick 5 vol 0');
+  XMPlayer.nextTick();
+  assert.equal(xm.global_volume, 0, 'row 1 tick 0 vol 0');
+  XMPlayer.nextTick();
+  assert.equal(xm.global_volume, 18, 'row 1 tick 1 vol 18');
+  XMPlayer.nextTick();  // row 1 tick 2
+  XMPlayer.nextTick();  // tick 3
+  XMPlayer.nextTick();  // tick 4
+  XMPlayer.nextTick();  // tick 5
+  assert.equal(xm.global_volume, 90, 'row 1 tick 5 vol 90');
+  XMPlayer.nextTick();  // row 2 tick 0
+  assert.equal(xm.global_volume, 90, 'row 2 tick 0 vol 90');
+  XMPlayer.nextTick();  // row 2 tick 1
+  assert.equal(xm.global_volume, 108, 'row 2 tick 1 vol 108');
+  XMPlayer.nextTick();  // tick 2
+  XMPlayer.nextTick();  // tick 3
+  assert.equal(xm.global_volume, 128, 'row 2 tick 3 vol 128');
+  XMPlayer.nextTick();  // tick 4
+  XMPlayer.nextTick();  // tick 5
+  XMPlayer.nextTick();  // row 3 tick 0
+  assert.equal(xm.global_volume, 128, 'row 3 tick 0 vol 128');
+  XMPlayer.nextTick();  // tick 1
+  assert.equal(xm.global_volume, 128, 'row 3 tick 1 vol 128');
+  XMPlayer.nextTick();  // tick 2
+  assert.equal(xm.global_volume, 128, 'row 3 tick 2 vol 128');
+};
+
 exports['test E5x finetune override'] = function(assert) {
   var xm = testdata.resetXMData();
   // set an initial finetune so we know we're overriding it...
