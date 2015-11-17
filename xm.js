@@ -802,9 +802,9 @@ function load(arrayBuf) {
         var samppan = dv.getUint8(idx+15);
         var sampnote = dv.getInt8(idx+16);
         var sampname = getstring(dv, idx+18, 22);
-        var sampleoffset = idx + samphdrsiz + totalsamples;
-        console.log("sample %d: len %d name '%s' loop %d/%d vol %d",
-            j, samplen, sampname, samploop, samplooplen, sampvol);
+        var sampleoffset = idx + nsamp * samphdrsiz + totalsamples;
+        console.log("sample %d: len %d name '%s' loop %d/%d vol %d offset %s",
+            j, samplen, sampname, samploop, samplooplen, sampvol, sampleoffset.toString(16));
         console.log("           type %d note %s(%d) finetune %d pan %d",
             samptype, prettify_note(sampnote + 12*4), sampnote, sampfinetune, samppan);
         console.log("           vol env", env_vol, env_vol_sustain,
