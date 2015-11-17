@@ -133,6 +133,7 @@ function setCurrentPattern() {
 }
 
 function nextRow() {
+  player.cur_row++;
   if (player.cur_pat == -1 || player.cur_row >= player.xm.patterns[player.cur_pat].length) {
     player.cur_row = 0;
     player.cur_songpos++;
@@ -142,7 +143,6 @@ function nextRow() {
   }
   var p = player.xm.patterns[player.cur_pat];
   var r = p[player.cur_row];
-  player.cur_row++;
   for (var i = 0; i < r.length; i++) {
     var ch = player.xm.channelinfo[i];
     var inst = ch.inst;
@@ -331,13 +331,13 @@ function nextTick() {
     }
     if (isNaN(ch.period)) {
       console.log(prettify_notedata(
-            player.xm.patterns[player.cur_pat][player.cur_row-1][j]),
+            player.xm.patterns[player.cur_pat][player.cur_row][j]),
           "set channel", j, "period to NaN");
     }
     if (inst === undefined) continue;
     if (ch.env_vol === undefined) {
       console.log(prettify_notedata(
-            player.xm.patterns[player.cur_pat][player.cur_row-1][j]),
+            player.xm.patterns[player.cur_pat][player.cur_row][j]),
           "set channel", j, "env_vol to undefined, but note is playing");
       continue;
     }
@@ -590,7 +590,7 @@ function audio_cb(e) {
         scopes: scopes,
         songpos: player.cur_songpos,
         pat: player.cur_pat,
-        row: player.cur_row - 1
+        row: player.cur_row
       });
       offset += tickduration;
       player.cur_ticksamp += tickduration;

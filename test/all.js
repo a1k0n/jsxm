@@ -17,7 +17,7 @@ exports['test XM startup'] = function(assert) {
   assert.equal(XMPlayer.cur_songpos, 0, 'advance to initial song position');
   assert.equal(XMPlayer.cur_pat, 0, 'advance to pattern 0');
   assert.equal(XMPlayer.cur_tick, 0, 'advance to tick 0');
-  assert.equal(XMPlayer.cur_row, 1, 'advance to row 1');
+  assert.equal(XMPlayer.cur_row, 0, 'advance to row 0');
 };
 
 exports['test non-existing song position'] = function(assert) {
@@ -33,7 +33,7 @@ exports['test non-existing song position'] = function(assert) {
   XMPlayer.nextTick();
   assert.equal(XMPlayer.cur_songpos, 0, 'advance to initial song position');
   assert.equal(XMPlayer.cur_pat, 0, 'advance to pattern 0');
-  assert.equal(XMPlayer.cur_row, 1, 'advance to row 1');
+  assert.equal(XMPlayer.cur_row, 0, 'advance to row 0');
   XMPlayer.nextTick();
   assert.equal(XMPlayer.cur_songpos, 1, 'advance to song position 1');
   assert.equal(XMPlayer.cur_pat, 1, 'advance to pattern 1');
@@ -92,7 +92,7 @@ exports['test non-existing song position with loop'] = function(assert) {
   XMPlayer.nextTick();
   assert.equal(XMPlayer.cur_songpos, 0, 'advance to initial song position');
   assert.equal(XMPlayer.cur_pat, 0, 'advance to pattern 0');
-  assert.equal(XMPlayer.cur_row, 1, 'advance to row 1');
+  assert.equal(XMPlayer.cur_row, 0, 'advance to row 0');
   XMPlayer.nextTick();
   assert.equal(XMPlayer.cur_songpos, 1, 'advance to song position 1');
   assert.equal(XMPlayer.cur_pat, 1, 'advance to pattern 1');
@@ -115,7 +115,7 @@ exports['test non-existing song position with invalid loop'] = function(assert) 
   XMPlayer.nextTick();
   assert.equal(XMPlayer.cur_songpos, 0, 'advance to initial song position');
   assert.equal(XMPlayer.cur_pat, 0, 'advance to pattern 0');
-  assert.equal(XMPlayer.cur_row, 1, 'advance to row 1');
+  assert.equal(XMPlayer.cur_row, 0, 'advance to row 0');
   XMPlayer.nextTick();
   assert.equal(XMPlayer.cur_songpos, 1, 'advance to song position 1');
   assert.equal(XMPlayer.cur_pat, 1, 'advance to pattern 1');

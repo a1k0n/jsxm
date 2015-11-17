@@ -26,9 +26,9 @@ exports['test instrument trigger'] = function(assert) {
   XMPlayer.nextRow();
   ch.pan = 1;  // forcibly override panning
   ch.off = 100;  // and sample offset
-  assert.equal(XMPlayer.cur_row, 1, 'row 1');
+  assert.equal(XMPlayer.cur_row, 0, 'row 0');
   XMPlayer.nextRow();
-  assert.equal(XMPlayer.cur_row, 2, 'row 2');
+  assert.equal(XMPlayer.cur_row, 1, 'row 1');
   assert.equal(ch.note, 48, 'note same after inst trigger');
   assert.equal(ch.period, 1152, 'period same after inst trigger');
   assert.equal(ch.vol, 64, 'vol reset after inst trigger');

@@ -121,7 +121,7 @@ function eff_t0_d(ch, data) {  // pattern jump
   if (player.cur_songpos >= player.xm.songpats.length)
     player.cur_songpos = player.xm.song_looppos;
   player.cur_pat = player.xm.songpats[player.cur_songpos];
-  player.cur_row = data;
+  player.cur_row = data - 1;
 }
 
 function eff_t0_e(ch, data) {  // extended effects!
