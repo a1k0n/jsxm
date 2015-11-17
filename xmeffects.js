@@ -109,6 +109,7 @@ function eff_t0_b(ch, data) {  // song jump (untested)
   if (data < player.xm.songpats.length) {
     player.cur_songpos = data;
     player.cur_pat = player.xm.songpats[player.cur_songpos];
+    player.cur_row = -1;
   }
 }
 

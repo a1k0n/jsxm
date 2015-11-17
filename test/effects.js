@@ -154,6 +154,39 @@ exports['test 4xy vibrato'] = function(assert) {
   assert.equal(p.toFixed(3), "-1.546", 'row 5 tick 1 period -1.546');
 };
 
+exports['test dxx pattern jump'] = function(assert) {
+  var xm = testdata.resetXMData();
+  xm.tempo = 2;
+  xm.patterns[0] = [
+    [[-1, -1, -1, 0x0, 0x00]],  // --- -- -- 000
+    [[49,  1, -1, 0x0, 0x00]],  // C#4  1 -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // --- -- -- 000
+  ];
+  xm.patterns[1] = [
+    [[-1, -1, -1, 0x0, 0x00]],  // --- -- -- 000
+    [[48,  1, -1, 0xd, 0x01]],  // C-4  1 -- D01
+    [[-1, -1, -1, 0x0, 0x00]],  // --- -- -- 000
+  ];
+  xm.songpats = [1, 0];
+  XMPlayer.nextTick();  // play first, empty row (pattern 1)
+  XMPlayer.nextTick();
+  assert.equal(XMPlayer.cur_songpos, 0, "songpos 0");
+  assert.equal(XMPlayer.cur_pat, 1, "pattern 1");
+  assert.equal(XMPlayer.cur_row, 0, "row 0");
+
+  XMPlayer.nextTick();  // play C-4  1 -- D01 in pattern 1
+  XMPlayer.nextTick();  // we will jump to pattern 0 row 1 after this
+
+  assert.equal(xm.channelinfo[0].period, 1152, "play C-4 on Dxx row");
+
+  XMPlayer.nextTick();  // play C#4  1 -- 000 in pattern 0
+
+  assert.equal(xm.channelinfo[0].period, 1136, "play C#4 on following row");
+  assert.equal(XMPlayer.cur_songpos, 1, "songpos 0");
+  assert.equal(XMPlayer.cur_pat, 0, "pattern 1");
+  assert.equal(XMPlayer.cur_row, 1, "row 1");
+};
+
 exports['test Axy volume slide'] = function(assert) {
   var xm = testdata.resetXMData();
   XMPlayer.xm.tempo = 6;
