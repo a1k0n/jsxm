@@ -209,7 +209,7 @@ function redrawScreen() {
     }
   }
 
-  if (e.row != shown_row) {
+  if (e.row != shown_row || e.pat != pat_canvas_patnum) {
     if (e.pat != pat_canvas_patnum) {
       var p = player.xm.patterns[e.pat];
       if (p) {
@@ -217,6 +217,7 @@ function redrawScreen() {
         pat_canvas_patnum = e.pat;
       }
     }
+
     var gfx = document.getElementById("gfxpattern");
     ctx = gfx.getContext('2d');
     ctx.fillStyle = '#000';
