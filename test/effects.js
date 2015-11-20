@@ -2,7 +2,6 @@ var XMPlayer = window.XMPlayer;
 
 // tests TODO:
 //  - bxx: song jump
-//  - dxx: pattern jump
 //  - rxy: retrigger w/ volume changes
 // low priority TODO (trivial or already covered by other tests):
 //  - 5xy: porta+vol
@@ -207,13 +206,23 @@ exports['test Dxx pattern jump'] = function(assert) {
   var xm = testdata.resetXMData();
   xm.tempo = 2;
   xm.patterns[0] = [
-    [[-1, -1, -1, 0x0, 0x00]],  // --- -- -- 000
-    [[49,  1, -1, 0x0, 0x00]],  // C#4  1 -- 000
-    [[-1, -1, -1, 0x0, 0x00]],  // --- -- -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // 00 --- -- -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // 01 --- -- -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // 02 --- -- -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // 03 --- -- -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // 04 --- -- -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // 05 --- -- -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // 06 --- -- -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // 07 --- -- -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // 08 --- -- -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // 09 --- -- -- 000
+    [[49,  1, -1, 0x0, 0x00]],  // 0a C#4  1 -- 000
+    [[-1, -1, -1, 0x0, 0x00]],  // 0b --- -- -- 000
   ];
+  // argument is BCD, so 0x10 actually means 10 (decimal)
   xm.patterns[1] = [
     [[-1, -1, -1, 0x0, 0x00]],  // --- -- -- 000
-    [[48,  1, -1, 0xd, 0x01]],  // C-4  1 -- D01
+    [[48,  1, -1, 0xd, 0x10]],  // C-4  1 -- D10
     [[-1, -1, -1, 0x0, 0x00]],  // --- -- -- 000
   ];
   xm.songpats = [1, 0];
@@ -228,12 +237,12 @@ exports['test Dxx pattern jump'] = function(assert) {
 
   assert.equal(xm.channelinfo[0].period, 1152, "play C-4 on Dxx row");
 
-  XMPlayer.nextTick();  // play C#4  1 -- 000 in pattern 0
+  XMPlayer.nextTick();  // play row 0x0a C#4  1 -- 000 in pattern 0
 
   assert.equal(xm.channelinfo[0].period, 1136, "play C#4 on following row");
   assert.equal(XMPlayer.cur_songpos, 1, "songpos 0");
   assert.equal(XMPlayer.cur_pat, 0, "pattern 1");
-  assert.equal(XMPlayer.cur_row, 1, "row 1");
+  assert.equal(XMPlayer.cur_row, 10, "row 10");
 };
 
 exports['test Gxx global volume'] = function(assert) {
