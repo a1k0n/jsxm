@@ -115,6 +115,7 @@ function RenderPattern(canv, pattern) {
       // render note
       var note = data[0];
       if (note < 0) {
+        // no note = ...
         ctx.drawImage(fontimg, 0, 8*5, 16, 8, dx, dy, 16, 8);
       } else {
         var octave = (note/12)|0;
@@ -137,6 +138,7 @@ function RenderPattern(canv, pattern) {
       // render volume
       var vol = data[2];
       if (vol < 0x10) {
+        // no volume = ..
         ctx.drawImage(fontimg, 312, 0, 8, 8, dx, dy, 8, 8);
       } else {
         ctx.drawImage(fontimg, 8*(vol>>4) + 56*8, 4*8, 8, 8, dx, dy, 8, 8);
@@ -147,10 +149,17 @@ function RenderPattern(canv, pattern) {
       // render effect
       var eff = data[3];
       var effdata = data[4];
-      ctx.drawImage(fontimg, 8*eff + 16*8, 4*8, 8, 8, dx, dy, 8, 8);
-      dx += 8;
-      ctx.drawImage(fontimg, 8*(effdata>>4), 4*8, 4, 8, dx, dy, 4, 8);
-      ctx.drawImage(fontimg, 8*(effdata&15), 4*8, 4, 8, dx+4, dy, 4, 8);
+      if (eff !== 0 || effdata !== 0) {
+        // draw effect with tiny font (4px space + effect type 0..9a..z)
+        ctx.drawImage(fontimg, 8*eff + 16*8, 4*8, 8, 8, dx, dy, 8, 8);
+        dx += 8;
+        // (hexadecimal 4-width font)
+        ctx.drawImage(fontimg, 8*(effdata>>4), 4*8, 4, 8, dx, dy, 4, 8);
+        ctx.drawImage(fontimg, 8*(effdata&15), 4*8, 4, 8, dx+4, dy, 4, 8);
+      } else {
+        // no effect = ...
+        ctx.drawImage(fontimg, 0, 8*5, 16, 8, dx+2, dy, 16, 8);
+      }
     }
   }
 }
