@@ -65,7 +65,7 @@ function eff_t0_4(ch, data) {  // vibrato
 }
 
 function eff_t1_4(ch) {  // vibrato
-  ch.periodoffset = Math.sin(ch.vibratopos * Math.PI / 32) * ch.vibratodepth;
+  ch.periodoffset = getVibratoDelta(ch.vibratotype, ch.vibratopos) * ch.vibratodepth;
   if (isNaN(ch.periodoffset)) {
     console.log("vibrato periodoffset NaN?",
         ch.vibratopos, ch.vibratospeed, ch.vibratodepth);
@@ -73,6 +73,24 @@ function eff_t1_4(ch) {  // vibrato
   }
   ch.vibratopos += ch.vibratospeed;
   ch.vibratopos &= 63;
+}
+
+function getVibratoDelta(type, x) {
+  var delta = 0;
+  switch (type & 0x03) {
+    case 1: // sawtooth (ramp-down)
+      delta = ((1 + x * 2 / 64) % 2) - 1;
+      break;
+    case 2: // square
+    case 3: // random (in FT2 these two are the same)
+      delta = x < 32 ? 1 : -1;
+      break;
+    case 0:
+    default: // sine
+      delta = Math.sin(x * Math.PI / 32);
+      break;
+  }
+  return delta;
 }
 
 function eff_t1_5(ch) {  // portamento + volume slide
