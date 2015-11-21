@@ -135,6 +135,9 @@ function eff_t0_e(ch, data) {  // extended effects!
     case 2:  // fine porta down
       ch.period += data;
       break;
+    case 4:  // set vibrato waveform
+      ch.vibratotype = data & 0x07;
+      break;
     case 5:  // finetune
       ch.fine = (data<<4) + data - 128;
       break;

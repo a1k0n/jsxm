@@ -697,6 +697,7 @@ function load(arrayBuf) {
       vibratopos: 0,
       vibratodepth: 1,
       vibratospeed: 1,
+      vibratotype: 0,
     });
   }
   console.log("header len " + hlen);

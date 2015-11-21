@@ -25,6 +25,7 @@ exports.resetXMData = function() {
     vibratopos: 0,
     vibratodepth: 1,
     vibratospeed: 1,
+    vibratotype: 0,
   });
   xm.songpats = [0];
   // 1 channel, 2 row blank pattern
