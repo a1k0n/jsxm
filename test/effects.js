@@ -90,12 +90,13 @@ exports['test 4xy vibrato'] = function(assert) {
   // vibrato 4xy: speed x, depth y
   // full cycle is 64/speed
   xm.patterns[0] = [
-    [[48,  1, -1, 4, 0x81]],  // C-4  1 -- 481
-    [[-1, -1, -1, 4, 0x02]],  // --- -- -- 402
-    [[-1, -1, -1, 4, 0x10]],  // --- -- -- 410
-    [[-1, -1, -1, 4, 0x00]],  // --- -- -- 400
-    [[-1, -1, -1, 0, 0x00]],  // --- -- -- 000 - no vibrato
-    [[-1, -1, -1, 4, 0x00]],  // --- -- -- 400 - resume vibrato @ pos 0
+    [[48,  1, -1, 4, 0x81]],    // C-4  1 -- 481
+    [[-1, -1, -1, 4, 0x02]],    // --- -- -- 402
+    [[-1, -1, -1, 4, 0x10]],    // --- -- -- 410
+    [[-1, -1, -1, 4, 0x00]],    // --- -- -- 400
+    [[-1, -1, -1, 0, 0x00]],    // --- -- -- --- - no vibrato
+    [[-1, -1, -1, 4, 0x00]],    // --- -- -- 400 - resume vibrato @ pos 0
+    [[-1, -1, 0xb2, 0, 0x00]],  // --- -- V2 --- - volume effect vibrato
   ];
   // I should really be testing ch.doff directly
   XMPlayer.xm.tempo = 3;
@@ -151,6 +152,12 @@ exports['test 4xy vibrato'] = function(assert) {
   XMPlayer.nextTick();  // row 5 tick 1
   p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
   assert.equal(p.toFixed(3), "-1.546", 'row 5 tick 1 period -1.546');
+  XMPlayer.nextTick();  // row 5 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.414", 'row 5 tick 2 period -1.414');
+  XMPlayer.nextTick();  // row 6 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.269", 'row 6 tick 0 period -1.269');
 };
 
 exports['test Axy volume slide'] = function(assert) {

@@ -207,6 +207,12 @@ function nextRow() {
         ch.vol = Math.max(0, ch.vol - (v & 0x0f));
       } else if (v >= 0x90 && v < 0xa0) {  // fine volume slide up
         ch.vol = Math.min(64, ch.vol + (v & 0x0f));
+      } else if (v >= 0xa0 && v < 0xb0) {  // vibrato speed
+        ch.vibratospeed = v & 0x0f;
+      } else if (v >= 0xb0 && v < 0xc0) {  // vibrato w/ depth
+        ch.vibratodepth = v & 0x0f;
+        ch.voleffectfn = player.effects_t1[4];  // use vibrato effect directly
+        player.effects_t1[4](ch);  // and also call it on tick 0
       } else if (v >= 0xc0 && v < 0xd0) {  // set panning
         ch.pan = (v & 0x0f) * 0x11;
       } else {
