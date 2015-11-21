@@ -56,7 +56,7 @@ function eff_t1_3(ch) {  // portamento
 
 function eff_t0_4(ch, data) {  // vibrato
   if (data & 0x0f) {
-    ch.vibratodepth = data & 0x0f;
+    ch.vibratodepth = (data & 0x0f) * 2;
   }
   if (data >> 4) {
     ch.vibratospeed = data >> 4;
@@ -65,14 +65,35 @@ function eff_t0_4(ch, data) {  // vibrato
 }
 
 function eff_t1_4(ch) {  // vibrato
-  ch.periodoffset = Math.sin(ch.vibratopos * Math.PI / 32) * ch.vibratodepth;
+  ch.periodoffset = getVibratoDelta(ch.vibratotype, ch.vibratopos) * ch.vibratodepth;
   if (isNaN(ch.periodoffset)) {
     console.log("vibrato periodoffset NaN?",
         ch.vibratopos, ch.vibratospeed, ch.vibratodepth);
     ch.periodoffset = 0;
   }
-  ch.vibratopos += ch.vibratospeed;
-  ch.vibratopos &= 63;
+  // only updates on non-first ticks
+  if (player.cur_tick > 0) {
+    ch.vibratopos += ch.vibratospeed;
+    ch.vibratopos &= 63;
+  }
+}
+
+function getVibratoDelta(type, x) {
+  var delta = 0;
+  switch (type & 0x03) {
+    case 1: // sawtooth (ramp-down)
+      delta = ((1 + x * 2 / 64) % 2) - 1;
+      break;
+    case 2: // square
+    case 3: // random (in FT2 these two are the same)
+      delta = x < 32 ? 1 : -1;
+      break;
+    case 0:
+    default: // sine
+      delta = Math.sin(x * Math.PI / 32);
+      break;
+  }
+  return delta;
 }
 
 function eff_t1_5(ch) {  // portamento + volume slide
@@ -134,6 +155,9 @@ function eff_t0_e(ch, data) {  // extended effects!
       break;
     case 2:  // fine porta down
       ch.period += data;
+      break;
+    case 4:  // set vibrato waveform
+      ch.vibratotype = data & 0x07;
       break;
     case 5:  // finetune
       ch.fine = (data<<4) + data - 128;

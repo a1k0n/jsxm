@@ -264,6 +264,10 @@ function nextRow() {
       if (ch.note) {
         ch.period = periodForNote(ch, ch.note);
       }
+      // waveforms 0-3 are retriggered on new notes while 4-7 are continuous
+      if (ch.vibratotype < 4) {
+        ch.vibratopos = 0;
+      }
     }
   }
 }
@@ -697,6 +701,7 @@ function load(arrayBuf) {
       vibratopos: 0,
       vibratodepth: 1,
       vibratospeed: 1,
+      vibratotype: 0,
     });
   }
   console.log("header len " + hlen);

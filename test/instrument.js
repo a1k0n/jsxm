@@ -46,10 +46,12 @@ exports['test note trigger'] = function(assert) {
   XMPlayer.nextRow();
   ch.pan = 1;  // forcibly override panning
   ch.off = 100;  // and sample offset
+  ch.vibratopos = 1; // and vibrato position
   XMPlayer.nextRow();
   assert.equal(ch.note, 49, 'note updated after inst trigger');
   assert.equal(ch.period, 1136, 'period updated after note trigger');
   assert.equal(ch.vol, 0x33, 'vol not reset after note trigger');
   assert.equal(ch.pan, 1, 'pan not reset after note trigger');
   assert.equal(ch.off, 0, 'set offset=0');
+  assert.equal(ch.vibratopos, 0, 'set vibrato pos=0');
 };
