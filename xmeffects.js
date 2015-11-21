@@ -56,7 +56,7 @@ function eff_t1_3(ch) {  // portamento
 
 function eff_t0_4(ch, data) {  // vibrato
   if (data & 0x0f) {
-    ch.vibratodepth = data & 0x0f;
+    ch.vibratodepth = (data & 0x0f) * 2;
   }
   if (data >> 4) {
     ch.vibratospeed = data >> 4;
