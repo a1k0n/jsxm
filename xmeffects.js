@@ -71,8 +71,11 @@ function eff_t1_4(ch) {  // vibrato
         ch.vibratopos, ch.vibratospeed, ch.vibratodepth);
     ch.periodoffset = 0;
   }
-  ch.vibratopos += ch.vibratospeed;
-  ch.vibratopos &= 63;
+  // only updates on non-first ticks
+  if (player.cur_tick > 0) {
+    ch.vibratopos += ch.vibratospeed;
+    ch.vibratopos &= 63;
+  }
 }
 
 function getVibratoDelta(type, x) {
