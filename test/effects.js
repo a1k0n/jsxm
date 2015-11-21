@@ -160,6 +160,143 @@ exports['test 4xy vibrato - sine'] = function(assert) {
   assert.equal(p.toFixed(3), "-1.111", 'row 6 tick 0 period -1.111');
 };
 
+exports['test 4xy vibrato - saw'] = function(assert) {
+  var xm = testdata.resetXMData();
+  // vibrato 4xy: speed x, depth y
+  // full cycle is 64/speed
+  xm.patterns[0] = [
+    [[48,  1, -1, 14, 0x41]],  // C-4  1 -- E41 - 1 = saw (ramp-down)
+    [[-1, -1, -1,  4, 0x81]],  // --- -- -- 481
+    [[-1, -1, -1,  4, 0x00]],  // --- -- -- 400
+    [[-1, -1, -1,  0, 0x00]],  // --- -- -- --- - no vibrato
+    [[-1, -1, -1,  4, 0x00]],  // --- -- -- 400 - resume vibrato @ pos 0
+  ];
+  XMPlayer.xm.tempo = 4;
+  var ch = xm.channelinfo[0];
+  assert.equal(ch.vibratotype, 0, 'initial vibratotype 0');
+  XMPlayer.nextTick();  // row 0 tick 0
+  var p0 = ch.doff;
+  assert.equal(ch.vibratotype, 1, 'row 0 tick 0 vibratotype=1');
+  XMPlayer.nextTick();  // row 0 tick 1
+  XMPlayer.nextTick();  // row 0 tick 2
+  XMPlayer.nextTick();  // row 0 tick 3
+  XMPlayer.nextTick();  // row 1 tick 0
+  assert.equal(ch.periodoffset, 0, 'row 1 tick 0 periodoffset=0');
+  XMPlayer.nextTick();  // row 1 tick 1
+  // compute logical period p from actual play frequency
+  var p = 16*12 * Math.log(p0 / ch.doff) / Math.log(2);
+  assert.equal(p.toFixed(3), "0.000", 'row 1 tick 1 period +0');
+  XMPlayer.nextTick();  // row 1 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "0.500", 'row 1 tick 2 period +0.500');
+  XMPlayer.nextTick();  // row 1 tick 3
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "1.000", 'row 1 tick 3 period +1.000');
+  XMPlayer.nextTick();  // row 2 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "1.500", 'row 2 tick 0 period +1.500');
+  XMPlayer.nextTick();  // row 2 tick 1
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "1.500", 'row 2 tick 1 period +1.500');
+  XMPlayer.nextTick();  // row 2 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-2.000", 'row 2 tick 2 period -2.000');
+  XMPlayer.nextTick();  // row 2 tick 3
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.500", 'row 2 tick 3 period -1.500');
+  XMPlayer.nextTick();  // row 3 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "0.000", 'row 3 tick 0 period 0 - no vibrato');
+  XMPlayer.nextTick();  // row 3 tick 1
+  XMPlayer.nextTick();  // row 3 tick 2
+  XMPlayer.nextTick();  // row 3 tick 3
+  XMPlayer.nextTick();  // row 4 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.000", 'row 4 tick 0 period -1.000 - vibrato resume');
+  XMPlayer.nextTick();  // row 4 tick 1
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-1.000", 'row 4 tick 1 period -1.000');
+  XMPlayer.nextTick();  // row 4 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-0.500", 'row 4 tick 2 period -0.500');
+  XMPlayer.nextTick();  // row 4 tick 3
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "0.000", 'row 4 tick 3 period +0');
+};
+
+exports['test 4xy vibrato - square'] = function(assert) {
+  var xm = testdata.resetXMData();
+  // vibrato 4xy: speed x, depth y
+  // full cycle is 64/speed
+  xm.patterns[0] = [
+    [[48,  1, -1, 14, 0x42]],  // C-4  1 -- E42 - 2 = square
+    [[-1, -1, -1,  4, 0x81]],  // --- -- -- 481
+    [[-1, -1, -1,  4, 0x02]],  // --- -- -- 402
+    [[-1, -1, -1,  4, 0x10]],  // --- -- -- 410
+    [[-1, -1, -1,  4, 0x03]],  // --- -- -- 403
+    [[-1, -1, -1,  0, 0x00]],  // --- -- -- --- - no vibrato
+    [[-1, -1, -1,  4, 0x00]],  // --- -- -- 400 - resume vibrato @ pos 0
+  ];
+  XMPlayer.xm.tempo = 3;
+  var ch = xm.channelinfo[0];
+  assert.equal(ch.vibratotype, 0, 'initial vibratotype 0');
+  XMPlayer.nextTick();  // row 0 tick 0
+  var p0 = ch.doff;
+  assert.equal(ch.vibratotype, 2, 'row 0 tick 0 vibratotype=2');
+  XMPlayer.nextTick();  // row 0 tick 1
+  XMPlayer.nextTick();  // row 0 tick 2
+  XMPlayer.nextTick();  // row 1 tick 0
+  assert.equal(ch.periodoffset, 2, 'row 1 tick 0 periodoffset=2');
+  XMPlayer.nextTick();  // row 1 tick 1
+  // compute logical period p from actual play frequency
+  var p = 16*12 * Math.log(p0 / ch.doff) / Math.log(2);
+  assert.equal(p.toFixed(3), "2.000", 'row 1 tick 1 period +2.000');
+  XMPlayer.nextTick();  // row 1 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "2.000", 'row 1 tick 2 period +2.000');
+  XMPlayer.nextTick();  // row 2 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "4.000", 'row 2 tick 0 period +4.000');
+  XMPlayer.nextTick();  // row 2 tick 1
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "4.000", 'row 2 tick 1 period +4.000');
+  XMPlayer.nextTick();  // row 2 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "4.000", 'row 2 tick 2 period +4.000');
+  XMPlayer.nextTick();  // row 3 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-4.000", 'row 3 tick 0 period -4.000');
+  XMPlayer.nextTick();  // row 3 tick 1
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-4.000", 'row 3 tick 1 period -4.000');
+  XMPlayer.nextTick();  // row 3 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-4.000", 'row 3 tick 2 period -4.000');
+  XMPlayer.nextTick();  // row 4 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-6.000", 'row 4 tick 0 period -6.000');
+  XMPlayer.nextTick();  // row 4 tick 1
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-6.000", 'row 4 tick 1 period -6.000');
+  XMPlayer.nextTick();  // row 4 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-6.000", 'row 4 tick 2 period -6.000');
+  XMPlayer.nextTick();  // row 4 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "0.000", 'row 4 tick 0 period 0 - no vibrato');
+  XMPlayer.nextTick();  // row 4 tick 1
+  XMPlayer.nextTick();  // row 4 tick 2
+  XMPlayer.nextTick();  // row 5 tick 0
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-6.000", 'row 5 tick 0 period -6.000 - vibrato resume');
+  XMPlayer.nextTick();  // row 5 tick 1
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-6.000", 'row 5 tick 1 period -6.000');
+  XMPlayer.nextTick();  // row 5 tick 2
+  p = -16*12 * Math.log(ch.doff / p0) / Math.log(2);
+  assert.equal(p.toFixed(3), "-6.000", 'row 5 tick 2 period -6.000');
+};
+
 exports['test Axy volume slide'] = function(assert) {
   var xm = testdata.resetXMData();
   XMPlayer.xm.tempo = 6;
@@ -320,6 +457,28 @@ exports['test Hxy global volume slide'] = function(assert) {
   assert.equal(xm.global_volume, 128, 'row 3 tick 1 vol 128');
   XMPlayer.nextTick();  // tick 2
   assert.equal(xm.global_volume, 128, 'row 3 tick 2 vol 128');
+};
+
+exports['test E4x set vibrato waveform'] = function(assert) {
+  var xm = testdata.resetXMData();
+  xm.patterns = [
+    [
+      [[48, 1, -1,  0, 0x00]], // C-4  1 -- ---  (default waveform - sine)
+      [[48, 1, -1, 14, 0x41]], // C-4  1 -- E41  (saw, ramp-down)
+      [[48, 1, -1, 14, 0x42]], // C-4  1 -- E42  (square)
+      [[48, 1, -1, 14, 0x43]]  // C-4  1 -- E43  (random)
+    ]
+  ];
+  xm.tempo = 1;
+  var ch = xm.channelinfo[0];
+  XMPlayer.nextTick();
+  assert.equal(ch.vibratotype, 0, 'row 0 tick 0 vibratotype=0');
+  XMPlayer.nextTick();
+  assert.equal(ch.vibratotype, 1, 'row 1 tick 0 vibratotype=1');
+  XMPlayer.nextTick();
+  assert.equal(ch.vibratotype, 2, 'row 2 tick 0 vibratotype=2');
+  XMPlayer.nextTick();
+  assert.equal(ch.vibratotype, 3, 'row 3 tick 0 vibratotype=3');
 };
 
 exports['test E5x finetune override'] = function(assert) {
