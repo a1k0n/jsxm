@@ -7,7 +7,10 @@
   "repository": "a1k0n/jsxm",
   "author": "Andy Sloane <andy@a1k0n.net> (http://www.a1k0n.net/)",
   "license": "MIT",
-
+  "contributors": [{
+    "name": "Johan Hillerström",
+    "email": "progr@mmer.nu"
+  }],
   "main": "index.html",
   "window": {
     "frame": true,
