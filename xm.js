@@ -932,17 +932,12 @@ function play() {
     jsNode.connect(gainNode);
 
     // hack to get iOS to play anything
-    /*
-     * this seems to cause other player issues... disabling for now
     var temp_osc = player.audioctx.createOscillator();
     temp_osc.connect(player.audioctx.destination);
     if (temp_osc.noteOn) temp_osc.start = temp_osc.noteOn;
-    temp_osc.frequency.value = 1;
     temp_osc.start(0);
-    setTimeout(10, function() {
-      temp_osc.disconnect();
-    });
-    */
+    temp_osc.stop();
+    temp_osc.disconnect();
   }
   player.playing = true;
 }
