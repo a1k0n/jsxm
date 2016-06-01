@@ -89,7 +89,6 @@ function filterCoeffs(f_c) {
   var wct = Math.sqrt(2) * Math.PI * f_c;
   var e = Math.exp(-wct);
   var c = e * Math.cos(wct);
-  var s = e * Math.sin(wct);
   var gain = (1 - 2*c + e*e) / 2;
   return [gain, 2*c, -e*e];
 }
