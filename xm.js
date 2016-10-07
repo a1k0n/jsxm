@@ -606,10 +606,10 @@ function audio_cb(e) {
         pat: player.cur_pat,
         row: player.cur_row
       });
-      offset += tickduration;
-      player.cur_ticksamp += tickduration;
-      buflen -= tickduration;
     }
+    offset += tickduration;
+    player.cur_ticksamp += tickduration;
+    buflen -= tickduration;
   }
 }
 
