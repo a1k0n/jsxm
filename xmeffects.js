@@ -162,6 +162,25 @@ function eff_t0_e(ch, data) {  // extended effects!
     case 5:  // finetune
       ch.fine = (data<<4) + data - 128;
       break;
+    case 6:  // pattern loop
+      if (data == 0) {
+        ch.loopstart = player.cur_row
+      } else {
+        if (typeof ch.loopend === 'undefined') {
+          ch.loopend = player.cur_row
+          ch.loopremaining = data
+        }
+        if(ch.loopremaining !== 0) {
+          ch.loopremaining--
+          player.goto_row = ch.loopstart || 0
+        }
+        else {
+          delete ch.loopend
+          delete ch.loopstart
+          delete player.goto_row
+        }
+      }
+      break;
     case 8:  // panning
       ch.pan = data * 0x11;
       break;

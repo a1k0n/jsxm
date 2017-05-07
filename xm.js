@@ -132,7 +132,13 @@ function setCurrentPattern() {
 }
 
 function nextRow() {
-  player.cur_row++;
+  if(typeof player.goto_row == "undefined") {
+    player.cur_row++;
+  } else {
+    player.cur_row = player.goto_row;
+    delete player.goto_row;
+  }
+
   if (player.cur_pat == -1 || player.cur_row >= player.xm.patterns[player.cur_pat].length) {
     player.cur_row = 0;
     player.cur_songpos++;
