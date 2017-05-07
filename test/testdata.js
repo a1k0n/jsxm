@@ -1,7 +1,8 @@
 var XMPlayer = window.XMPlayer;
 
 // set up basic blank single-channel, single-pattern XM
-exports.resetXMData = function() {
+exports.resetXMData = function(channels) {
+  if(typeof channels == 'undefined') { channels =  1 }
   var xm = {};
   window.XMPlayer.xm = xm;
   xm.channelinfo = [];
@@ -11,22 +12,24 @@ exports.resetXMData = function() {
   xm.flags = 1;
   xm.tempo = 3;
   xm.bpm = 125;
-  xm.channelinfo.push({
-    number: 0,
-    filterstate: new Float32Array(3),
-    vol: 0,
-    pan: 128,
-    period: 1920 - 48*16,
-    vL: 0, vR: 0,
-    vLprev: 0, vRprev: 0,
-    mute: 0,
-    volE: 0, panE: 0,
-    retrig: 0,
-    vibratopos: 0,
-    vibratodepth: 1,
-    vibratospeed: 1,
-    vibratotype: 0,
-  });
+  for(var i = 0; i < channels; i++){
+    xm.channelinfo.push({
+      number: i,
+      filterstate: new Float32Array(3),
+      vol: 0,
+      pan: 128,
+      period: 1920 - 48*16,
+      vL: 0, vR: 0,
+      vLprev: 0, vRprev: 0,
+      mute: 0,
+      volE: 0, panE: 0,
+      retrig: 0,
+      vibratopos: 0,
+      vibratodepth: 1,
+      vibratospeed: 1,
+      vibratotype: 0,
+    });
+  }
   xm.songpats = [0];
   // 1 channel, 2 row blank pattern
   xm.patterns = [
