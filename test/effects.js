@@ -504,3 +504,32 @@ exports['test E5x finetune override'] = function(assert) {
   var f2 = 12 * 128 * Math.log(ch.doff / f0) / Math.log(2);
   assert.equal(f2.toFixed(2), "131.00", "E5f finetune +127");
 };
+
+exports['test E60 loop twice with set beginning'] = function(assert) {
+  var xm = testdata.resetXMData(2);
+
+  xm.patterns[0] = [
+    [[60, 1, -1, 0, 0], [-1, -1, -1, 0x0, 0x00]], // 0  0
+    [[62, 1, -1, 0, 0], [-1, -1, -1, 0xE, 0x60]], // 1   1  4  7
+    [[64, 1, -1, 0, 0], [-1, -1, -1, 0x0, 0x00]], // 2    2  5  8
+    [[65, 1, -1, 0, 0], [-1, -1, -1, 0xE, 0x62]], // 3     3  6  9
+    [[66, 1, -1, 0, 0], [-1, -1, -1, 0x0, 0x00]]  // 4            10
+  ];                                              // ^r t->
+
+  //  C-5 1  --  ---     --  --  --  --- |
+  //  D-5 1  --  ---     --  --  --  E60 | set repeat start
+  //  E-5 1  --  ---     --  --  --  --- |
+  //  F-5 1  --  ---     --  --  --  E62 | goto repeate start twice
+  //  G-5 1  --  ---     --  --  --  --- |
+
+  xm.tempo = 2;
+  var rowProgression = []
+  for(var i = 0; i < 11; i++) {
+    XMPlayer.nextTick();
+    XMPlayer.nextTick();
+    rowProgression.push(XMPlayer.cur_row)
+  }
+
+  assert.deepEqual(rowProgression, [0,1,2,3, 1,2,3, 1,2,3,4], "row 10"
+  );
+}

@@ -143,7 +143,7 @@ function eff_t0_d(ch, data) {  // pattern jump
   if (player.cur_songpos >= player.xm.songpats.length)
     player.cur_songpos = player.xm.song_looppos;
   player.cur_pat = player.xm.songpats[player.cur_songpos];
-  player.cur_row = (data >> 4) * 10 + (data & 0x0f) - 1;
+  player.next_row = (data >> 4) * 10 + (data & 0x0f);
 }
 
 function eff_t0_e(ch, data) {  // extended effects!
@@ -161,6 +161,23 @@ function eff_t0_e(ch, data) {  // extended effects!
       break;
     case 5:  // finetune
       ch.fine = (data<<4) + data - 128;
+      break;
+    case 6:  // pattern loop
+      if (data == 0) {
+        ch.loopstart = player.cur_row
+      } else {
+        if (typeof ch.loopend === "undefined") {
+          ch.loopend = player.cur_row
+          ch.loopremaining = data
+        }
+        if(ch.loopremaining !== 0) {
+          ch.loopremaining--
+          player.next_row = ch.loopstart || 0
+        } else {
+          delete ch.loopend
+          delete ch.loopstart
+        }
+      }
       break;
     case 8:  // panning
       ch.pan = data * 0x11;
