@@ -143,7 +143,7 @@ function eff_t0_d(ch, data) {  // pattern jump
   if (player.cur_songpos >= player.xm.songpats.length)
     player.cur_songpos = player.xm.song_looppos;
   player.cur_pat = player.xm.songpats[player.cur_songpos];
-  player.cur_row = (data >> 4) * 10 + (data & 0x0f) - 1;
+  player.next_row = (data >> 4) * 10 + (data & 0x0f);
 }
 
 function eff_t0_e(ch, data) {  // extended effects!
@@ -166,18 +166,16 @@ function eff_t0_e(ch, data) {  // extended effects!
       if (data == 0) {
         ch.loopstart = player.cur_row
       } else {
-        if (typeof ch.loopend === 'undefined') {
+        if (typeof ch.loopend === "undefined") {
           ch.loopend = player.cur_row
           ch.loopremaining = data
         }
         if(ch.loopremaining !== 0) {
           ch.loopremaining--
-          player.goto_row = ch.loopstart || 0
-        }
-        else {
+          player.next_row = ch.loopstart || 0
+        } else {
           delete ch.loopend
           delete ch.loopstart
-          delete player.goto_row
         }
       }
       break;
