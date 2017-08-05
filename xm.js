@@ -937,9 +937,8 @@ function play() {
     // hack to get iOS to play anything
     var temp_osc = player.audioctx.createOscillator();
     temp_osc.connect(player.audioctx.destination);
-    if (temp_osc.noteOn) temp_osc.start = temp_osc.noteOn;
-    temp_osc.start(0);
-    temp_osc.stop();
+    !!temp_osc.start ? temp_osc.start(0) : temp_osc.noteOn(0);
+    !!temp_osc.stop ? temp_osc.stop(0) : temp_osc.noteOff(0);
     temp_osc.disconnect();
   }
   player.playing = true;
