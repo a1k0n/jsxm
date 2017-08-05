@@ -126,10 +126,10 @@ function eff_t1_a(ch) {  // volume slide
   }
 }
 
-function eff_t0_b(ch, data) {  // song jump (untested)
+function eff_t0_b(ch, data) {  // song jump
   if (data < player.xm.songpats.length) {
-    player.cur_songpos = data;
-    player.cur_pat = player.xm.songpats[player.cur_songpos];
+    player.cur_songpos = data - 1;
+    player.cur_pat = -1;
     player.cur_row = -1;
   }
 }
