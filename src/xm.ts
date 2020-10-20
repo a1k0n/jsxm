@@ -33,12 +33,12 @@ class Inst {
 // if (!window.XMPlayer) {
 //   window.XMPlayer = {};
 // }
-var player = window.XMPlayer;
+let player = window.XMPlayer;
 
 // if (!window.XMView) {
 //   window.XMView = {};
 // }
-var XMView = window.XMView;
+let XMView = window.XMView;
 
 // public class Player 
 player.periodForNote = periodForNote;
@@ -62,15 +62,15 @@ player.nextRow = nextRow;
 player.Envelope = Envelope;
 
 // for pretty-printing notes
-var _note_names = [
+let _note_names = [
   "C-", "C#", "D-", "D#", "E-", "F-",
   "F#", "G-", "G#", "A-", "A#", "B-"];
 
-var f_smp = 44100;  // updated by play callback, default value here
+let f_smp = 44100;  // updated by play callback, default value here
 
 // per-sample exponential moving average for volume changes (to prevent pops
 // and clicks); evaluated every 8 samples
-var popfilter_alpha = 0.9837;
+let popfilter_alpha = 0.9837;
 
 function prettify_note(note) {
   if (note < 0) return "---";
@@ -103,9 +103,9 @@ function prettify_notedata(data) {
 }
 
 function getstring(dv, offset, len) {
-  var str = [];
-  for (var i = offset; i < offset + len; i++) {
-    var c = dv.getUint8(i);
+  let str = [];
+  for (let i = offset; i < offset + len; i++) {
+    let c = dv.getUint8(i);
     if (c === 0) break;
     str.push(String.fromCharCode(c));
   }
@@ -118,15 +118,15 @@ function filterCoeffs(f_c) {
   if (f_c > 0.5) {  // we can't lowpass above the nyquist frequency...
     f_c = 0.5;
   }
-  var wct = Math.sqrt(2) * Math.PI * f_c;
-  var e = Math.exp(-wct);
-  var c = e * Math.cos(wct);
-  var gain = (1 - 2 * c + e * e) / 2;
+  let wct = Math.sqrt(2) * Math.PI * f_c;
+  let e = Math.exp(-wct);
+  let c = e * Math.cos(wct);
+  let gain = (1 - 2 * c + e * e) / 2;
   return [gain, 2 * c, -e * e];
 }
 
 function updateChannelPeriod(ch: ChannelInfo, period) {
-  var freq = 8363 * Math.pow(2, (1152.0 - period) / 192.0);
+  let freq = 8363 * Math.pow(2, (1152.0 - period) / 192.0);
   if (isNaN(freq)) {
     console.log("invalid period!", period);
     return;
@@ -140,7 +140,7 @@ function periodForNote(ch, note) {
 }
 
 function setCurrentPattern() {
-  var nextPat = player.xm.songpats[player.cur_songpos];
+  let nextPat = player.xm.songpats[player.cur_songpos];
 
   // check for out of range pattern index
   while (nextPat >= player.xm.patterns.length) {
@@ -176,12 +176,12 @@ function nextRow() {
       player.cur_songpos = player.xm.song_looppos;
     setCurrentPattern();
   }
-  var p = player.xm.patterns[player.cur_pat];
-  var r = p[player.cur_row];
-  for (var i = 0; i < r.length; i++) {
-    var ch: ChannelInfo = player.xm.channelinfo[i];
-    var inst = ch.inst;
-    var triggernote = false;
+  let p = player.xm.patterns[player.cur_pat];
+  let r = p[player.cur_row];
+  for (let i = 0; i < r.length; i++) {
+    let ch: ChannelInfo = player.xm.channelinfo[i];
+    let inst = ch.inst;
+    let triggernote = false;
     // instrument trigger
     if (r[i][1] != -1) {
       inst = player.xm.instruments[r[i][1] - 1];
@@ -207,7 +207,7 @@ function nextRow() {
         triggernote = false;
       } else {
         if (inst && inst.samplemap) {
-          var note = r[i][0];
+          let note = r[i][0];
           ch.note = note;
           ch.samp = inst.samples[inst.samplemap[ch.note]];
           if (triggernote) {
@@ -224,7 +224,7 @@ function nextRow() {
 
     ch.voleffectfn = undefined;
     if (r[i][2] != -1) {  // volume column
-      var v = r[i][2];
+      let v = r[i][2];
       ch.voleffectdata = v & 0x0f;
       if (v < 0x10) {
         console.log("channel", i, "invalid volume", v.toString(16));
@@ -264,7 +264,7 @@ function nextRow() {
     ch.effectdata = r[i][4];
     if (ch.effect < 36) {
       ch.effectfn = player.effects_t1[ch.effect];
-      var eff_t0 = player.effects_t0[ch.effect];
+      let eff_t0 = player.effects_t0[ch.effect];
       if (eff_t0 && eff_t0(ch, ch.effectdata)) {
         triggernote = false;
       }
@@ -330,7 +330,7 @@ function nextTick() {
 
   for (let j = 0; j < player.xm.nchan; j++) {
     const ch: ChannelInfo = player.xm.channelinfo[j];
-    var inst = ch.inst;
+    let inst = ch.inst;
     if (player.cur_tick !== 0) {
       if (ch.voleffectfn) ch.voleffectfn(ch);
       if (ch.effectfn) ch.effectfn(ch);
@@ -356,12 +356,12 @@ function nextTick() {
 // This function gradually brings the channel back down to zero if it isn't
 // already to avoid clicks and pops when samples end.
 function MixSilenceIntoBuf(ch, start, end, dataL, dataR) {
-  var s = ch.filterstate[1];
+  let s = ch.filterstate[1];
   if (isNaN(s)) {
     console.log("NaN filterstate?", ch.filterstate, ch.filter);
     return;
   }
-  for (var i = start; i < end; i++) {
+  for (let i = start; i < end; i++) {
     if (Math.abs(s) < 1.526e-5) {  // == 1/65536.0
       s = 0;
       break;
@@ -373,37 +373,37 @@ function MixSilenceIntoBuf(ch, start, end, dataL, dataR) {
   ch.filterstate[1] = s;
   ch.filterstate[2] = s;
   if (isNaN(s)) {
-    console.log("NaN filterstate after adding silence?", ch.filterstate, ch.filter, i);
+    console.log("NaN filterstate after adding silence?", ch.filterstate, ch.filter);
     return;
   }
   return 0;
 }
 
 function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
-  var inst = ch.inst;
-  var instsamp = ch.samp;
-  var loop = false;
-  var looplen = 0, loopstart = 0;
+  let inst = ch.inst;
+  let instsamp = ch.samp;
+  let loop = false;
+  let looplen = 0, loopstart = 0;
 
   // nothing on this channel, just filter the last dc offset back down to zero
   if (instsamp == undefined || inst == undefined || ch.mute) {
     return MixSilenceIntoBuf(ch, start, end, dataL, dataR);
   }
 
-  var samp = instsamp.sampledata;
-  var sample_end = instsamp.len;
+  let samp = instsamp.sampledata;
+  let sample_end = instsamp.len;
   if ((instsamp.type & 3) == 1 && instsamp.looplen > 0) {
     loop = true;
     loopstart = instsamp.loop;
     looplen = instsamp.looplen;
     sample_end = loopstart + looplen;
   }
-  var samplen = instsamp.len;
-  var volE = ch.volE / 64.0;    // current volume envelope
-  var panE = 4 * (ch.panE - 32);  // current panning envelope
-  var p = panE + ch.pan - 128;  // final pan
-  var volL = player.xm.global_volume * volE * (128 - p) * ch.vol / (64 * 128 * 128);
-  var volR = player.xm.global_volume * volE * (128 + p) * ch.vol / (64 * 128 * 128);
+  let samplen = instsamp.len;
+  let volE = ch.volE / 64.0;    // current volume envelope
+  let panE = 4 * (ch.panE - 32);  // current panning envelope
+  let p = panE + ch.pan - 128;  // final pan
+  let volL = player.xm.global_volume * volE * (128 - p) * ch.vol / (64 * 128 * 128);
+  let volR = player.xm.global_volume * volE * (128 + p) * ch.vol / (64 * 128 * 128);
   if (volL < 0) volL = 0;
   if (volR < 0) volR = 0;
   if (volR === 0 && volL === 0)
@@ -412,23 +412,23 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
     console.log("NaN volume!?", ch.number, volL, volR, volE, panE, ch.vol);
     return;
   }
-  var k = ch.off;
-  var dk = ch.doff;
-  var Vrms = 0;
-  var f0 = ch.filter[0], f1 = ch.filter[1], f2 = ch.filter[2];
-  var fs0 = ch.filterstate[0], fs1 = ch.filterstate[1], fs2 = ch.filterstate[2];
+  let k = ch.off;
+  let dk = ch.doff;
+  let Vrms = 0;
+  let f0 = ch.filter[0], f1 = ch.filter[1], f2 = ch.filter[2];
+  let fs0 = ch.filterstate[0], fs1 = ch.filterstate[1], fs2 = ch.filterstate[2];
 
   // we also low-pass filter volume changes with a simple one-zero,
   // one-pole filter to avoid pops and clicks when volume changes.
-  var vL = popfilter_alpha * ch.vL + (1 - popfilter_alpha) * (volL + ch.vLprev) * 0.5;
-  var vR = popfilter_alpha * ch.vR + (1 - popfilter_alpha) * (volR + ch.vRprev) * 0.5;
-  var pf_8 = Math.pow(popfilter_alpha, 8);
+  let vL = popfilter_alpha * ch.vL + (1 - popfilter_alpha) * (volL + ch.vLprev) * 0.5;
+  let vR = popfilter_alpha * ch.vR + (1 - popfilter_alpha) * (volR + ch.vRprev) * 0.5;
+  let pf_8 = Math.pow(popfilter_alpha, 8);
   ch.vLprev = volL;
   ch.vRprev = volR;
 
   // we can mix up to this many bytes before running into a sample end/loop
-  var i = start;
-  var failsafe = 100;
+  let i = start;
+  let failsafe = 100;
   while (i < end) {
     if (failsafe-- === 0) {
       console.log("failsafe in mixing loop! channel", ch.number, k, sample_end,
@@ -445,11 +445,11 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
         return Vrms + MixSilenceIntoBuf(ch, i, end, dataL, dataR);
       }
     }
-    var next_event = Math.max(1, Math.min(end, i + (sample_end - k) / dk));
+    let next_event = Math.max(1, Math.min(end, i + (sample_end - k) / dk));
     // this is the inner loop of the player
 
     // unrolled 8x
-    var s, y;
+    let s, y;
     for (; i + 7 < next_event; i += 8) {
       s = samp[k | 0];
       y = f0 * (s + fs0) + f1 * fs1 + f2 * fs2;
@@ -545,20 +545,19 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
 
 function audio_cb(e) {
   f_smp = player.audioctx.sampleRate;
-  var time_sound_started;
-  var buflen = e.outputBuffer.length;
-  var dataL = e.outputBuffer.getChannelData(0);
-  var dataR = e.outputBuffer.getChannelData(1);
-  var i, j, k;
 
-  for (i = 0; i < buflen; i++) {
+  let buflen = e.outputBuffer.length;
+  let dataL = e.outputBuffer.getChannelData(0);
+  let dataR = e.outputBuffer.getChannelData(1);
+
+  for (let i = 0; i < buflen; i++) {
     dataL[i] = 0;
     dataR[i] = 0;
   }
 
-  var offset = 0;
-  var ticklen = 0 | (f_smp * 2.5 / player.xm.bpm);
-  var scopewidth = XMView.scope_width;
+  let offset = 0;
+  let ticklen = 0 | (f_smp * 2.5 / player.xm.bpm);
+  let scopewidth = XMView.scope_width;
 
   while (buflen > 0) {
     if (player.cur_pat == -1 || player.cur_ticksamp >= ticklen) {
@@ -567,14 +566,14 @@ function audio_cb(e) {
       nextTick();
       player.cur_ticksamp -= ticklen;
     }
-    var tickduration = Math.min(buflen, ticklen - player.cur_ticksamp);
-    var VU = new Float32Array(player.xm.nchan);
-    var scopes = undefined;
-    for (j = 0; j < player.xm.nchan; j++) {
-      var scope;
+    let tickduration = Math.min(buflen, ticklen - player.cur_ticksamp);
+    let VU = new Float32Array(player.xm.nchan);
+    let scopes = undefined;
+    for (let j = 0; j < player.xm.nchan; j++) {
+      let scope;
       if (tickduration >= 4 * scopewidth) {
         scope = new Float32Array(scopewidth);
-        for (k = 0; k < scopewidth; k++) {
+        for (let k = 0; k < scopewidth; k++) {
           scope[k] = -dataL[offset + k * 4] - dataR[offset + k * 4];
         }
       }
@@ -584,7 +583,7 @@ function audio_cb(e) {
         tickduration;
 
       if (tickduration >= 4 * scopewidth) {
-        for (k = 0; k < scopewidth; k++) {
+        for (let k = 0; k < scopewidth; k++) {
           scope[k] += dataL[offset + k * 4] + dataR[offset + k * 4];
         }
         if (scopes === undefined) scopes = [];
@@ -608,9 +607,9 @@ function audio_cb(e) {
 }
 
 function ConvertSample(array, bits) {
-  var len = array.length;
-  var acc = 0;
-  var samp, b, k;
+  let len = array.length;
+  let acc = 0;
+  let samp, b, k;
   if (bits === 0) {  // 8 bit sample
     samp = new Float32Array(len);
     for (k = 0; k < len; k++) {
@@ -636,25 +635,25 @@ function ConvertSample(array, bits) {
 // optimization: unroll short sample loops so we can run our inner mixing loop
 // uninterrupted for as long as possible; this also handles pingpong loops.
 function UnrollSampleLoop(samp) {
-  var nloops = ((2048 + samp.looplen - 1) / samp.looplen) | 0;
-  var pingpong = samp.type & 2;
+  let nloops = ((2048 + samp.looplen - 1) / samp.looplen) | 0;
+  let pingpong = samp.type & 2;
   if (pingpong) {
     // make sure we have an even number of loops if we are pingponging
     nloops = (nloops + 1) & (~1);
   }
-  var samplesiz = samp.loop + nloops * samp.looplen;
-  var data = new Float32Array(samplesiz);
+  let samplesiz = samp.loop + nloops * samp.looplen;
+  let data = new Float32Array(samplesiz);
   for (var i = 0; i < samp.loop; i++) {
     data[i] = samp.sampledata[i];
   }
-  for (var j = 0; j < nloops; j++) {
-    var k;
+ 
+  for (let j = 0; j < nloops; j++) {
     if ((j & 1) && pingpong) {
-      for (k = samp.looplen - 1; k >= 0; k--) {
+      for (let k = samp.looplen - 1; k >= 0; k--) {
         data[i++] = samp.sampledata[samp.loop + k];
       }
     } else {
-      for (k = 0; k < samp.looplen; k++) {
+      for (let k = 0; k < samp.looplen; k++) {
         data[i++] = samp.sampledata[samp.loop + k];
       }
     }
@@ -666,25 +665,23 @@ function UnrollSampleLoop(samp) {
 }
 
 function load(arrayBuf) {
-  var dv = new DataView(arrayBuf);
+  let dv = new DataView(arrayBuf);
   player.xm = new XM();
 
   player.xm.songname = getstring(dv, 17, 20);
-  var hlen = dv.getUint32(0x3c, true) + 0x3c;
-  var songlen = dv.getUint16(0x40, true);
+  let hlen = dv.getUint32(0x3c, true) + 0x3c;
+  let songlen = dv.getUint16(0x40, true);
   player.xm.song_looppos = dv.getUint16(0x42, true);
   player.xm.nchan = dv.getUint16(0x44, true);
-  var npat = dv.getUint16(0x46, true);
-  var ninst = dv.getUint16(0x48, true);
+  let npat = dv.getUint16(0x46, true);
+  let ninst = dv.getUint16(0x48, true);
   player.xm.flags = dv.getUint16(0x4a, true);
   player.xm.tempo = dv.getUint16(0x4c, true);
   player.xm.bpm = dv.getUint16(0x4e, true);
   player.xm.channelinfo = [];
   player.xm.global_volume = player.max_global_volume;
-
-  var i, j, k;
-
-  for (i = 0; i < player.xm.nchan; i++) {
+ 
+  for (let i = 0; i < player.xm.nchan; i++) {
     player.xm.channelinfo.push(new ChannelInfo({
       number: i,
       filterstate: new Float32Array(3),
@@ -709,24 +706,24 @@ function load(arrayBuf) {
   console.log("flags=%d tempo %d bpm %d", player.xm.flags, player.xm.tempo, player.xm.bpm);
 
   player.xm.songpats = [];
-  for (i = 0; i < songlen; i++) {
+  for (let i = 0; i < songlen; i++) {
     player.xm.songpats.push(dv.getUint8(0x50 + i));
   }
   console.log("song patterns: ", player.xm.songpats);
 
-  var idx = hlen;
+  let idx = hlen;
   player.xm.patterns = [];
-  for (i = 0; i < npat; i++) {
-    var pattern = [];
-    var patheaderlen = dv.getUint32(idx, true);
-    var patrows = dv.getUint16(idx + 5, true);
-    var patsize = dv.getUint16(idx + 7, true);
+  for (let i = 0; i < npat; i++) {
+    let pattern = [];
+    let patheaderlen = dv.getUint32(idx, true);
+    let patrows = dv.getUint16(idx + 5, true);
+    let patsize = dv.getUint16(idx + 7, true);
     console.log("pattern %d: %d bytes, %d rows", i, patsize, patrows);
     idx += 9;
-    for (j = 0; patsize > 0 && j < patrows; j++) {
+    for (let j = 0; patsize > 0 && j < patrows; j++) {
       const row = [];
-      for (k = 0; k < player.xm.nchan; k++) {
-        var byte0 = dv.getUint8(idx); idx++;
+      for (let k = 0; k < player.xm.nchan; k++) {
+        let byte0 = dv.getUint8(idx); idx++;
         let note = -1, inst = -1, vol = -1, efftype = 0, effparam = 0;
         if (byte0 & 0x80) {
           if (byte0 & 0x01) {
@@ -753,7 +750,7 @@ function load(arrayBuf) {
           efftype = dv.getUint8(idx); idx++;
           effparam = dv.getUint8(idx); idx++;
         }
-        var notedata = [note, inst, vol, efftype, effparam];
+        let notedata = [note, inst, vol, efftype, effparam];
         row.push(notedata);
       }
       pattern.push(row);
@@ -763,54 +760,54 @@ function load(arrayBuf) {
 
   player.xm.instruments = [];
   // now load instruments
-  for (i = 0; i < ninst; i++) {
-    var hdrsiz = dv.getUint32(idx, true);
-    var instname = getstring(dv, idx + 0x4, 22);
-    var nsamp = dv.getUint16(idx + 0x1b, true);
+  for (let i = 0; i < ninst; i++) {
+    let hdrsiz = dv.getUint32(idx, true);
+    let instname = getstring(dv, idx + 0x4, 22);
+    let nsamp = dv.getUint16(idx + 0x1b, true);
 
-    var inst: Inst = new Inst(instname, i)
+    let inst: Inst = new Inst(instname, i)
 
     if (nsamp > 0) {
-      var samplemap = new Uint8Array(arrayBuf, idx + 33, 96);
+      let samplemap = new Uint8Array(arrayBuf, idx + 33, 96);
 
-      var env_nvol = dv.getUint8(idx + 225);
-      var env_vol_type = dv.getUint8(idx + 233);
-      var env_vol_sustain = dv.getUint8(idx + 227);
-      var env_vol_loop_start = dv.getUint8(idx + 228);
-      var env_vol_loop_end = dv.getUint8(idx + 229);
-      var env_npan = dv.getUint8(idx + 226);
-      var env_pan_type = dv.getUint8(idx + 234);
-      var env_pan_sustain = dv.getUint8(idx + 230);
-      var env_pan_loop_start = dv.getUint8(idx + 231);
-      var env_pan_loop_end = dv.getUint8(idx + 232);
-      var vol_fadeout = dv.getUint16(idx + 239, true);
-      var env_vol: Array<number> = [];
-      for (j = 0; j < env_nvol * 2; j++) {
+      let env_nvol = dv.getUint8(idx + 225);
+      let env_vol_type = dv.getUint8(idx + 233);
+      let env_vol_sustain = dv.getUint8(idx + 227);
+      let env_vol_loop_start = dv.getUint8(idx + 228);
+      let env_vol_loop_end = dv.getUint8(idx + 229);
+      let env_npan = dv.getUint8(idx + 226);
+      let env_pan_type = dv.getUint8(idx + 234);
+      let env_pan_sustain = dv.getUint8(idx + 230);
+      let env_pan_loop_start = dv.getUint8(idx + 231);
+      let env_pan_loop_end = dv.getUint8(idx + 232);
+      let vol_fadeout = dv.getUint16(idx + 239, true);
+      let env_vol: Array<number> = [];
+      for (let j = 0; j < env_nvol * 2; j++) {
         env_vol.push(dv.getUint16(idx + 129 + j * 2, true));
       }
-      var env_pan = [];
-      for (j = 0; j < env_npan * 2; j++) {
+      let env_pan = [];
+      for (let j = 0; j < env_npan * 2; j++) {
         env_pan.push(dv.getUint16(idx + 177 + j * 2, true));
       }
       // FIXME: ignoring keymaps for now and assuming 1 sample / instrument
-      // var keymap = getarray(dv, idx+0x21);
-      var samphdrsiz = dv.getUint32(idx + 0x1d, true);
+      // let keymap = getarray(dv, idx+0x21);
+      let samphdrsiz = dv.getUint32(idx + 0x1d, true);
       console.log("hdrsiz %d; instrument %s: '%s' %d samples, samphdrsiz %d",
         hdrsiz, (i + 1).toString(16), instname, nsamp, samphdrsiz);
       idx += hdrsiz;
-      var totalsamples = 0;
-      var samps = [];
-      for (j = 0; j < nsamp; j++) {
-        var samplen = dv.getUint32(idx, true);
-        var samploop = dv.getUint32(idx + 4, true);
-        var samplooplen = dv.getUint32(idx + 8, true);
-        var sampvol = dv.getUint8(idx + 12);
-        var sampfinetune = dv.getInt8(idx + 13);
-        var samptype = dv.getUint8(idx + 14);
-        var samppan = dv.getUint8(idx + 15);
-        var sampnote = dv.getInt8(idx + 16);
-        var sampname = getstring(dv, idx + 18, 22);
-        var sampleoffset = totalsamples;
+      let totalsamples = 0;
+      let samps = [];
+      for (let j = 0; j < nsamp; j++) {
+        let samplen = dv.getUint32(idx, true);
+        let samploop = dv.getUint32(idx + 4, true);
+        let samplooplen = dv.getUint32(idx + 8, true);
+        let sampvol = dv.getUint8(idx + 12);
+        let sampfinetune = dv.getInt8(idx + 13);
+        let samptype = dv.getUint8(idx + 14);
+        let samppan = dv.getUint8(idx + 15);
+        let sampnote = dv.getInt8(idx + 16);
+        let sampname = getstring(dv, idx + 18, 22);
+        let sampleoffset = totalsamples;
         if (samplooplen === 0) {
           samptype &= ~3;
         }
@@ -823,7 +820,7 @@ function load(arrayBuf) {
           "fadeout", vol_fadeout);
         console.log("           pan env", env_pan, env_pan_sustain,
           env_pan_loop_start, env_pan_loop_end, "type", env_pan_type);
-        var samp = {
+        let samp = {
           'len': samplen, 'loop': samploop,
           'looplen': samplooplen, 'note': sampnote, 'fine': sampfinetune,
           'pan': samppan, 'type': samptype, 'vol': sampvol,
@@ -834,7 +831,7 @@ function load(arrayBuf) {
         idx += samphdrsiz;
         totalsamples += samplen;
       }
-      for (j = 0; j < nsamp; j++) {
+      for (let j = 0; j < nsamp; j++) {
         let samp = samps[j];
         samp.sampledata = ConvertSample(
           new Uint8Array(arrayBuf, idx + samp.fileoffset, samp.len), samp.type & 16);
@@ -853,12 +850,12 @@ function load(arrayBuf) {
       inst.samples = samps;
       if (env_vol_type) {
         // insert an automatic fadeout to 0 at the end of the envelope
-        var env_end_tick = env_vol[env_vol.length - 2];
+        let env_end_tick = env_vol[env_vol.length - 2];
         if (!(env_vol_type & 2)) {  // if there's no sustain point, create one
           env_vol_sustain = env_vol.length / 2;
         }
         if (vol_fadeout > 0) {
-          var fadeout_ticks = 65536.0 / vol_fadeout;
+          let fadeout_ticks = 65536.0 / vol_fadeout;
           env_vol.push(env_end_tick + fadeout_ticks);
           env_vol.push(0);
         }
@@ -898,10 +895,10 @@ function load(arrayBuf) {
   return true;
 }
 
-var jsNode, gainNode;
+let jsNode, gainNode;
 function init() {
   if (!player.audioctx) {
-    var audioContext = window.AudioContext || window.webkitAudioContext;
+    let audioContext = window.AudioContext || window.webkitAudioContext;
     player.audioctx = new audioContext();
     gainNode = player.audioctx.createGain();
     gainNode.gain.value = 0.1;  // master volume
@@ -924,7 +921,7 @@ function play() {
     jsNode.connect(gainNode);
 
     // hack to get iOS to play anything
-    var temp_osc = player.audioctx.createOscillator();
+    let temp_osc = player.audioctx.createOscillator();
     temp_osc.connect(player.audioctx.destination);
     !!temp_osc.start ? temp_osc.start(0) : temp_osc.noteOn(0);
     !!temp_osc.stop ? temp_osc.stop(0) : temp_osc.noteOff(0);
