@@ -1,10 +1,18 @@
 const CopyPlugin = require('copy-webpack-plugin');
+const path = require('path');
 
 module.exports = {
     entry: "./src/index.ts",
     output: {
       filename: "./bundle.js"
     },
+
+    devServer: {
+        // contentBase: path.join(__dirname, 'dist'),
+        contentBase:  './dist',
+        compress: true,
+        port: 9000
+      },
   
     // Enable sourcemaps for debugging webpack's output.
     devtool: "source-map",
@@ -27,7 +35,7 @@ module.exports = {
     plugins: [
         new CopyPlugin({
           patterns: [
-            { from: './public', to: './dist' },
+            { from: './public', to: '.' },
           ],
         }),
       ],
