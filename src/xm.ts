@@ -4,6 +4,7 @@ import { Envelope } from './models/Envelope'
 import { EnvelopeFollower } from './models/EnvelopeFollower'
 import { Sample } from './models/Sample'
 import { Instrument } from './models/Instrument'
+import { Pattern } from './models/Pattern'
 
  
 let player = window.XMPlayer;

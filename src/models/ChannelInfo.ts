@@ -1,4 +1,4 @@
-import { Inst } from './Instrument'
+import { Instrument } from './Instrument'
 import { Sample } from './Sample'
 import { EnvelopeFollower } from './EnvelopeFollower'
 
@@ -19,7 +19,7 @@ export class ChannelInfo {
     mute: number
     retrig: number
 
-    inst: Inst
+    inst: Instrument
     note: number
     samp: Sample
     vol: number

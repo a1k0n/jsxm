@@ -1,3 +1,4 @@
+import { Envelope } from "./Envelope"
 import { XM } from "./XM"
 
 export class XMPlayer {
@@ -22,7 +23,7 @@ export class XMPlayer {
     nextTick: any
     nextRow: any
 
-    Envelope: any;
+    Envelope: Envelope;
 
     next_row: number
 
