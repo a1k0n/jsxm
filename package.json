@@ -2,15 +2,20 @@
   "name": "jsxm",
   "version": "1.0.1",
   "description": "WebAudio FastTracker 2 .XM module player",
-  "keywords": "fasttracker xm webaudio",
+  "keywords": [
+    "fasttracker xm webaudio"
+  ],
   "uri": "http://www.a1k0n.net/code/jsxm/",
   "repository": "a1k0n/jsxm",
   "author": "Andy Sloane <andy@a1k0n.net> (http://www.a1k0n.net/)",
   "license": "MIT",
-  "contributors": [{
-    "name": "Johan Hillerström",
-    "email": "progr@mmer.nu"
-  }],
+  "contributors": [
+    {
+      "name": "Johan Hillerström",
+      "email": "progr@mmer.nu"
+    }
+  ],
+  "private": true,
   "main": "index.html",
   "window": {
     "frame": true,
@@ -18,6 +23,33 @@
     "position": "center",
     "resizable": true
   },
-  "scripts": { "test": "node test/all.js" },
-  "devDependencies": { "test": ">=0.0.5" }
+  "watch": {
+    "build": {
+      "extensions": "js,ts,html,scss",
+      "quiet": false
+    },
+    "test": {
+      "extensions": "js,ts,html,scss",
+      "quiet": false
+    }
+  },
+  "scripts": {
+    "test": "node test/all.js",
+    "watch-test": "npm-watch test",
+    "build": "webpack"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "copy-webpack-plugin": "^6.2.1",
+    "eslint": "^7.11.0",
+    "install": "^0.13.0",
+    "npm": "^6.14.8",
+    "npm-watch": "^0.7.0",
+    "source-map-loader": "^1.1.1",
+    "test": ">=0.0.5",
+    "ts-loader": "^8.0.6",
+    "typescript": "^4.0.3",
+    "webpack": "^5.1.3",
+    "webpack-cli": "^4.1.0"
+  }
 }

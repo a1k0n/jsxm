@@ -530,6 +530,7 @@ exports['test E60 loop twice with set beginning'] = function(assert) {
     rowProgression.push(XMPlayer.cur_row)
   }
 
+  
   assert.deepEqual(rowProgression, [0,1,2,3, 1,2,3, 1,2,3,4], "row 10"
   );
 }
