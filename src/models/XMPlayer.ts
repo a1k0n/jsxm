@@ -1,4 +1,4 @@
-import {XM } from "./XM"
+import { XM } from "./XM"
 
 export class XMPlayer {
     xm: XM
@@ -26,8 +26,8 @@ export class XMPlayer {
 
     next_row: number
 
-    effects_t0: Array<any>
-    effects_t1: Array<any>
+    effects_t0: Array<(number, any) => any>
+    effects_t1: Array<(number, any) => any>
 
     audioctx: any
     playing: boolean

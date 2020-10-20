@@ -1,43 +1,12 @@
 import { XM } from './models/XM'
 import { ChannelInfo } from './models/ChannelInfo'
-import { Envelope } from './models/Envelop'
-import { EnvelopeFollower } from './models/EnvelopFollower'
+import { Envelope } from './models/Envelope'
+import { EnvelopeFollower } from './models/EnvelopeFollower'
+import { Sample } from './models/Sample'
+import { Instrument } from './models/Instrument'
 
-
-
-class Inst {
-  name: string
-  number: number
-
-  samplemap: Uint8Array
-  samples: any
-
-  env_vol: Envelope
-  env_pan: Envelope
-
-  constructor(name: string, number: number) {
-    this.name = name
-    this.number = number
-
-    this.samplemap = undefined
-    this.samples = undefined
-
-    this.env_vol = undefined
-    this.env_pan = undefined
-  }
-}
-
-// const { XMPlayer } = require("./models/XMPlayer");
-
-// (function (window) {
-// if (!window.XMPlayer) {
-//   window.XMPlayer = {};
-// }
+ 
 let player = window.XMPlayer;
-
-// if (!window.XMView) {
-//   window.XMView = {};
-// }
 let XMView = window.XMView;
 
 // public class Player 
@@ -59,10 +28,10 @@ player.xm.global_volume = player.max_global_volume = 128;
 // exposed for testing
 player.nextTick = nextTick;
 player.nextRow = nextRow;
-player.Envelope = Envelope;
+// player.Envelope = Envelope;
 
 // for pretty-printing notes
-let _note_names = [
+const _note_names = [
   "C-", "C#", "D-", "D#", "E-", "F-",
   "F#", "G-", "G#", "A-", "A#", "B-"];
 
@@ -72,27 +41,28 @@ let f_smp = 44100;  // updated by play callback, default value here
 // and clicks); evaluated every 8 samples
 let popfilter_alpha = 0.9837;
 
-function prettify_note(note) {
+function prettify_note(note: number) {
   if (note < 0) return "---";
   if (note == 96) return "^^^";
   return _note_names[note % 12] + ~~(note / 12);
 }
 
-function prettify_number(num) {
+function prettify_number(num: number) {
   if (num == -1) return "--";
   if (num < 10) return "0" + num;
   return num;
 }
 
-function prettify_volume(num) {
+function prettify_volume(num: number) {
   if (num < 0x10) return "--";
   return num.toString(16);
 }
 
-function prettify_effect(t, p) {
-  if (t >= 10) t = String.fromCharCode(55 + t);
-  if (p < 16) p = '0' + p.toString(16);
-  else p = p.toString(16);
+function prettify_effect(t: number, p: number) {
+  let tn: string, pn: string
+  if (t >= 10) tn = String.fromCharCode(55 + t);
+  if (p < 16) pn = '0' + p.toString(16);
+  else pn = p.toString(16);
   return t + p;
 }
 
@@ -135,7 +105,7 @@ function updateChannelPeriod(ch: ChannelInfo, period) {
   ch.filter = filterCoeffs(ch.doff / 2);
 }
 
-function periodForNote(ch, note) {
+function periodForNote(ch: ChannelInfo, note: number) {
   return 1920 - (note + ch.samp.note) * 16 - ch.fine / 8.0;
 }
 
@@ -247,7 +217,7 @@ function nextRow() {
       } else if (v >= 0xb0 && v < 0xc0) {  // vibrato w/ depth
         ch.vibratodepth = v & 0x0f;
         ch.voleffectfn = player.effects_t1[4];  // use vibrato effect directly
-        player.effects_t1[4](ch);  // and also call it on tick 0
+        player.effects_t1[4](ch, undefined);  // and also call it on tick 0
       } else if (v >= 0xc0 && v < 0xd0) {  // set panning
         ch.pan = (v & 0x0f) * 0x11;
       } else if (v >= 0xf0 && v <= 0xff) {  // portamento
@@ -332,8 +302,8 @@ function nextTick() {
     const ch: ChannelInfo = player.xm.channelinfo[j];
     let inst = ch.inst;
     if (player.cur_tick !== 0) {
-      if (ch.voleffectfn) ch.voleffectfn(ch);
-      if (ch.effectfn) ch.effectfn(ch);
+      if (ch.voleffectfn) ch.voleffectfn(ch, undefined);
+      if (ch.effectfn) ch.effectfn(ch, undefined);
     }
     if (isNaN(ch.period)) {
       console.log(prettify_notedata(
@@ -355,7 +325,7 @@ function nextTick() {
 
 // This function gradually brings the channel back down to zero if it isn't
 // already to avoid clicks and pops when samples end.
-function MixSilenceIntoBuf(ch, start, end, dataL, dataR) {
+function MixSilenceIntoBuf(ch: ChannelInfo, start: number, end: number, dataL, dataR) {
   let s = ch.filterstate[1];
   if (isNaN(s)) {
     console.log("NaN filterstate?", ch.filterstate, ch.filter);
@@ -379,7 +349,7 @@ function MixSilenceIntoBuf(ch, start, end, dataL, dataR) {
   return 0;
 }
 
-function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
+function MixChannelIntoBuf(ch: ChannelInfo, start: number, end: number, dataL, dataR) {
   let inst = ch.inst;
   let instsamp = ch.samp;
   let loop = false;
@@ -398,7 +368,6 @@ function MixChannelIntoBuf(ch, start, end, dataL, dataR) {
     looplen = instsamp.looplen;
     sample_end = loopstart + looplen;
   }
-  let samplen = instsamp.len;
   let volE = ch.volE / 64.0;    // current volume envelope
   let panE = 4 * (ch.panE - 32);  // current panning envelope
   let p = panE + ch.pan - 128;  // final pan
@@ -606,13 +575,14 @@ function audio_cb(e) {
   }
 }
 
-function ConvertSample(array, bits) {
+function ConvertSample(array: Uint8Array, bits: number): Float32Array {
   let len = array.length;
-  let acc = 0;
-  let samp, b, k;
+
   if (bits === 0) {  // 8 bit sample
-    samp = new Float32Array(len);
-    for (k = 0; k < len; k++) {
+    const samp = new Float32Array(len);
+    let acc = 0;
+    let b = 0;
+    for (let k = 0; k < len; k++) {
       acc += array[k];
       b = acc & 255;
       if (b & 128) b = b - 256;
@@ -621,8 +591,11 @@ function ConvertSample(array, bits) {
     return samp;
   } else {
     len /= 2;
-    samp = new Float32Array(len);
-    for (k = 0; k < len; k++) {
+    const samp = new Float32Array(len);
+    let acc = 0;
+    let b = 0;
+
+    for (let k = 0; k < len; k++) {
       b = array[k * 2] + (array[k * 2 + 1] << 8);
       if (b & 32768) b = b - 65536;
       acc = Math.max(-1, Math.min(1, acc + b / 32768.0));
@@ -646,7 +619,7 @@ function UnrollSampleLoop(samp) {
   for (var i = 0; i < samp.loop; i++) {
     data[i] = samp.sampledata[i];
   }
- 
+
   for (let j = 0; j < nloops; j++) {
     if ((j & 1) && pingpong) {
       for (let k = samp.looplen - 1; k >= 0; k--) {
@@ -664,6 +637,7 @@ function UnrollSampleLoop(samp) {
   samp.type = 1;
 }
 
+
 function load(arrayBuf) {
   let dv = new DataView(arrayBuf);
   player.xm = new XM();
@@ -680,7 +654,7 @@ function load(arrayBuf) {
   player.xm.bpm = dv.getUint16(0x4e, true);
   player.xm.channelinfo = [];
   player.xm.global_volume = player.max_global_volume;
- 
+
   for (let i = 0; i < player.xm.nchan; i++) {
     player.xm.channelinfo.push(new ChannelInfo({
       number: i,
@@ -721,7 +695,7 @@ function load(arrayBuf) {
     console.log("pattern %d: %d bytes, %d rows", i, patsize, patrows);
     idx += 9;
     for (let j = 0; patsize > 0 && j < patrows; j++) {
-      const row = [];
+      const row: Array<Pattern> = [];
       for (let k = 0; k < player.xm.nchan; k++) {
         let byte0 = dv.getUint8(idx); idx++;
         let note = -1, inst = -1, vol = -1, efftype = 0, effparam = 0;
@@ -765,7 +739,7 @@ function load(arrayBuf) {
     let instname = getstring(dv, idx + 0x4, 22);
     let nsamp = dv.getUint16(idx + 0x1b, true);
 
-    let inst: Inst = new Inst(instname, i)
+    let inst: Instrument = new Instrument(instname, i)
 
     if (nsamp > 0) {
       let samplemap = new Uint8Array(arrayBuf, idx + 33, 96);
@@ -796,7 +770,7 @@ function load(arrayBuf) {
         hdrsiz, (i + 1).toString(16), instname, nsamp, samphdrsiz);
       idx += hdrsiz;
       let totalsamples = 0;
-      let samps = [];
+      let samps: Array<Sample> = [];
       for (let j = 0; j < nsamp; j++) {
         let samplen = dv.getUint32(idx, true);
         let samploop = dv.getUint32(idx + 4, true);
@@ -820,12 +794,17 @@ function load(arrayBuf) {
           "fadeout", vol_fadeout);
         console.log("           pan env", env_pan, env_pan_sustain,
           env_pan_loop_start, env_pan_loop_end, "type", env_pan_type);
-        let samp = {
-          'len': samplen, 'loop': samploop,
-          'looplen': samplooplen, 'note': sampnote, 'fine': sampfinetune,
-          'pan': samppan, 'type': samptype, 'vol': sampvol,
-          'fileoffset': sampleoffset
-        };
+        let samp = new Sample({
+          len: samplen,
+          loop: samploop,
+          looplen: samplooplen,
+          note: sampnote,
+          fine: sampfinetune,
+          pan: samppan,
+          type: samptype,
+          vol: sampvol,
+          fileoffset: sampleoffset
+        });
         // length / pointers are all specified in bytes; fixup for 16-bit samples
         samps.push(samp);
         idx += samphdrsiz;

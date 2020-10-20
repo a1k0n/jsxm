@@ -1,11 +1,11 @@
 export class Envelope {
     points: Array<number>;
-    type: any;
-    sustain: any;
+    type: number;
+    sustain: number;
     loopstart: number;
     loopend: number;
   
-    constructor(points: Array<number>, type, sustain, loopstart: number, loopend: number) {
+    constructor(points: Array<number>, type: number, sustain: number, loopstart: number, loopend: number) {
       this.points = points;
       this.type = type;
       this.sustain = sustain;

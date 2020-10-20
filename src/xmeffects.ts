@@ -1,8 +1,5 @@
-(function (window) {
-if (!window.XMPlayer) {
-  window.XMPlayer = {};
-}
-var player = window.XMPlayer;
+
+const player = window.XMPlayer;
 
 function eff_t1_0(ch) {  // arpeggio
   if (ch.effectdata !== 0 && ch.inst !== undefined) {
@@ -359,5 +356,4 @@ player.effects_t1 = [  // effect functions on tick 1+
   eff_unimplemented,  // y
   eff_unimplemented   // z
 ];
-
-})(window);
+ 

@@ -1,9 +1,10 @@
 import { ChannelInfo } from './ChannelInfo'
+import { Pattern } from './Pattern'
 
 export class XM {
     global_volume: any
     songpats: Array<any>
-    patterns: Array<any>
+    patterns: Array<Array<Array<Pattern>>>
     song_looppos: any
     channelinfo: Array<ChannelInfo>
     nchan: number
@@ -13,6 +14,8 @@ export class XM {
     tempo:number
     songname:string
     flags: any
+
+    global_volumeslide: number
 
     constructor() {}
 
