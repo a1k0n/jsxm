@@ -1,11 +1,12 @@
 import {Envelope} from './Envelope'
+import { Sample } from './Sample'
    
 export class Instrument {
   name: string
   number: number
 
   samplemap: Uint8Array
-  samples: any
+  samples: Sample[]
 
   env_vol: Envelope
   env_pan: Envelope

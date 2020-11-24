@@ -13,7 +13,7 @@ export class Envelope {
       this.loopend = points[loopend * 2];
     }
   
-    public Get(ticks) {
+    public Get(ticks: number) {
       // TODO: optimize follower with ptr
       // or even do binary search here
       var y0;
@@ -21,10 +21,10 @@ export class Envelope {
       for (var i = 0; i < env.length; i += 2) {
         y0 = env[i + 1];
         if (ticks < env[i]) {
-          var x0 = env[i - 2];
+          const x0 = env[i - 2];
           y0 = env[i - 1];
-          var dx = env[i] - x0;
-          var dy = env[i + 1] - y0;
+          const dx = env[i] - x0;
+          const dy = env[i + 1] - y0;
           return y0 + (ticks - x0) * dy / dx;
         }
       }

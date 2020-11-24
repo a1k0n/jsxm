@@ -26,14 +26,14 @@ export class ChannelInfo {
     pan: number
     fine: number
     release: number
-    voleffectfn: (channel: ChannelInfo, data: any) => any
+    voleffectfn: (channel: ChannelInfo, data: any) => void
     voleffectdata: number
     vibratospeed: number
     vibratodepth: number
     portaspeed: number
     effect: number
     effectdata: number
-    effectfn: (ch, data) => any 
+    effectfn: (ch, data) => void
     periodtarget: number
     env_vol: EnvelopeFollower
     env_pan: EnvelopeFollower

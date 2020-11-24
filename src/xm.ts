@@ -1,4 +1,4 @@
-import { XM } from './models/XM'
+import { XM, AudioContext } from './models/XM'
 import { ChannelInfo } from './models/ChannelInfo'
 import { Envelope } from './models/Envelope'
 import { EnvelopeFollower } from './models/EnvelopeFollower'
@@ -67,13 +67,13 @@ function prettify_effect(t: number, p: number) {
   return t + p;
 }
 
-function prettify_notedata(data) {
+function prettify_notedata(data: Pattern) {
   return (prettify_note(data[0]) + " " + prettify_number(data[1]) + " " +
     prettify_volume(data[2]) + " " +
     prettify_effect(data[3], data[4]));
 }
 
-function getstring(dv, offset, len) {
+function getstring(dv: DataView, offset: number, len: number) {
   let str = [];
   for (let i = offset; i < offset + len; i++) {
     let c = dv.getUint8(i);
@@ -85,7 +85,7 @@ function getstring(dv, offset, len) {
 
 // Return 2-pole Butterworth lowpass filter coefficients for
 // center frequncy f_c (relative to sampling frequency)
-function filterCoeffs(f_c) {
+function filterCoeffs(f_c: number) {
   if (f_c > 0.5) {  // we can't lowpass above the nyquist frequency...
     f_c = 0.5;
   }
@@ -96,7 +96,7 @@ function filterCoeffs(f_c) {
   return [gain, 2 * c, -e * e];
 }
 
-function updateChannelPeriod(ch: ChannelInfo, period) {
+function updateChannelPeriod(ch: ChannelInfo, period: number) {
   let freq = 8363 * Math.pow(2, (1152.0 - period) / 192.0);
   if (isNaN(freq)) {
     console.log("invalid period!", period);
@@ -326,7 +326,7 @@ function nextTick() {
 
 // This function gradually brings the channel back down to zero if it isn't
 // already to avoid clicks and pops when samples end.
-function MixSilenceIntoBuf(ch: ChannelInfo, start: number, end: number, dataL, dataR) {
+function MixSilenceIntoBuf(ch: ChannelInfo, start: number, end: number, dataL: number[], dataR: number[]) {
   let s = ch.filterstate[1];
   if (isNaN(s)) {
     console.log("NaN filterstate?", ch.filterstate, ch.filter);
@@ -350,7 +350,7 @@ function MixSilenceIntoBuf(ch: ChannelInfo, start: number, end: number, dataL, d
   return 0;
 }
 
-function MixChannelIntoBuf(ch: ChannelInfo, start: number, end: number, dataL, dataR) {
+function MixChannelIntoBuf(ch: ChannelInfo, start: number, end: number, dataL: number[], dataR: number[]) {
   let inst = ch.inst;
   let instsamp = ch.samp;
   let loop = false;
@@ -382,9 +382,9 @@ function MixChannelIntoBuf(ch: ChannelInfo, start: number, end: number, dataL, d
     console.log("NaN volume!?", ch.number, volL, volR, volE, panE, ch.vol);
     return;
   }
-  let k = ch.off;
-  let dk = ch.doff;
-  let Vrms = 0;
+  let k: number = ch.off;
+  let dk: number = ch.doff;
+  let Vrms: number = 0;
   let f0 = ch.filter[0], f1 = ch.filter[1], f2 = ch.filter[2];
   let fs0 = ch.filterstate[0], fs1 = ch.filterstate[1], fs2 = ch.filterstate[2];
 
@@ -397,7 +397,7 @@ function MixChannelIntoBuf(ch: ChannelInfo, start: number, end: number, dataL, d
   ch.vRprev = volR;
 
   // we can mix up to this many bytes before running into a sample end/loop
-  let i = start;
+  let i: number = start;
   let failsafe = 100;
   while (i < end) {
     if (failsafe-- === 0) {
@@ -419,7 +419,7 @@ function MixChannelIntoBuf(ch: ChannelInfo, start: number, end: number, dataL, d
     // this is the inner loop of the player
 
     // unrolled 8x
-    let s, y;
+    let s: number, y: number;
     for (; i + 7 < next_event; i += 8) {
       s = samp[k | 0];
       y = f0 * (s + fs0) + f1 * fs1 + f2 * fs2;
@@ -513,7 +513,7 @@ function MixChannelIntoBuf(ch: ChannelInfo, start: number, end: number, dataL, d
   return Vrms * 0.5;
 }
 
-function audio_cb(e) {
+function audio_cb(e: { outputBuffer: { length: any; getChannelData: (arg0: number) => any }; playbackTime: number }) {
   f_smp = player.audioctx.sampleRate;
 
   let buflen = e.outputBuffer.length;
@@ -540,7 +540,7 @@ function audio_cb(e) {
     let VU = new Float32Array(player.xm.nchan);
     let scopes = undefined;
     for (let j = 0; j < player.xm.nchan; j++) {
-      let scope;
+      let scope: any[] | Float32Array;
       if (tickduration >= 4 * scopewidth) {
         scope = new Float32Array(scopewidth);
         for (let k = 0; k < scopewidth; k++) {
@@ -608,7 +608,7 @@ function ConvertSample(array: Uint8Array, bits: number): Float32Array {
 
 // optimization: unroll short sample loops so we can run our inner mixing loop
 // uninterrupted for as long as possible; this also handles pingpong loops.
-function UnrollSampleLoop(samp) {
+function UnrollSampleLoop(samp: Sample) {
   let nloops = ((2048 + samp.looplen - 1) / samp.looplen) | 0;
   let pingpong = samp.type & 2;
   if (pingpong) {
@@ -639,7 +639,7 @@ function UnrollSampleLoop(samp) {
 }
 
 
-function load(arrayBuf) {
+function load(arrayBuf: ArrayBuffer) {
   let dv = new DataView(arrayBuf);
   player.xm = new XM();
 
@@ -689,14 +689,14 @@ function load(arrayBuf) {
   let idx = hlen;
   player.xm.patterns = [];
   for (let i = 0; i < npat; i++) {
-    let pattern = [];
-    let patheaderlen = dv.getUint32(idx, true);
+    let pattern: Pattern[][] = [];
+    // let patheaderlen = dv.getUint32(idx, true);
     let patrows = dv.getUint16(idx + 5, true);
     let patsize = dv.getUint16(idx + 7, true);
     console.log("pattern %d: %d bytes, %d rows", i, patsize, patrows);
     idx += 9;
     for (let j = 0; patsize > 0 && j < patrows; j++) {
-      const row: Array<Pattern> = [];
+      const row: Pattern[] = [];
       for (let k = 0; k < player.xm.nchan; k++) {
         let byte0 = dv.getUint8(idx); idx++;
         let note = -1, inst = -1, vol = -1, efftype = 0, effparam = 0;
@@ -740,7 +740,7 @@ function load(arrayBuf) {
     let instname = getstring(dv, idx + 0x4, 22);
     let nsamp = dv.getUint16(idx + 0x1b, true);
 
-    let inst: Instrument = new Instrument(instname, i)
+    let inst = new Instrument(instname, i)
 
     if (nsamp > 0) {
       let samplemap = new Uint8Array(arrayBuf, idx + 33, 96);
@@ -875,11 +875,12 @@ function load(arrayBuf) {
   return true;
 }
 
-let jsNode, gainNode;
+let jsNode: { onaudioprocess: (e: any) => void; connect: (arg0: any) => void; disconnect: (arg0: any) => void }, gainNode: { gain: { value: number }; connect: (arg0: any) => void };
 function init() {
   if (!player.audioctx) {
     let audioContext = window.AudioContext || window.webkitAudioContext;
-    player.audioctx = new audioContext();
+    let ctx = new audioContext()
+    player.audioctx = (ctx as any) as AudioContext;
     gainNode = player.audioctx.createGain();
     gainNode.gain.value = 0.1;  // master volume
   }
@@ -892,7 +893,7 @@ function init() {
   gainNode.connect(player.audioctx.destination);
 }
 
-player.playing = false;
+// player.playing = false;
 function play() {
   if (!player.playing) {
     // put paused events back into action, if any

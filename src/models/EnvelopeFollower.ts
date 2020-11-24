@@ -1,13 +1,15 @@
+import { Envelope } from "./Envelope";
+
 export class EnvelopeFollower {
-    env: any;
-    tick: any;
+    env: Envelope;
+    tick: number;
   
-    constructor(env) {
+    constructor(env: Envelope) {
       this.env = env;
       this.tick = 0;
     }
   
-    public Tick(release) {
+    public Tick(release: number) {
       var value = this.env.Get(this.tick);
   
       // if we're sustaining a note, stop advancing the tick counter
