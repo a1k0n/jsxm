@@ -1,7 +1,5 @@
 (function (window, document) {
-if (!window.XMPlayer) {
-  window.XMPlayer = {};
-}
+
 var player = window.XMPlayer;
 
 if (!window.XMView) {
@@ -9,9 +7,9 @@ if (!window.XMView) {
 }
 var view = window.XMView;
 
-var _pattern_cellwidth = 16 + 4 + 8 + 4 + 8 + 16 + 4;
-var _scope_width = _pattern_cellwidth - 1;
-var _pattern_border = 20;
+const _pattern_cellwidth = 16 + 4 + 8 + 4 + 8 + 16 + 4;
+const _scope_width = _pattern_cellwidth - 1;
+const _pattern_border = 20;
 
 view.init = init;
 view.pushEvent = pushEvent;
@@ -182,7 +180,7 @@ function redrawScreen() {
 
   if (e.scopes !== undefined) {
     // update VU meters & oscilliscopes
-    var canvas = document.getElementById("vu");
+    const canvas =  <HTMLCanvasElement>document.getElementById("vu");
     ctx = canvas.getContext("2d");
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, 64);
@@ -218,7 +216,7 @@ function redrawScreen() {
       }
     }
 
-    var gfx = document.getElementById("gfxpattern");
+    var gfx =  <HTMLCanvasElement>document.getElementById("gfxpattern");
     ctx = gfx.getContext('2d');
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, gfx.width, gfx.height);
@@ -236,7 +234,7 @@ function redrawScreen() {
 }
 
 function init() {
-  var title = document.getElementById("title");
+  var title =  <HTMLCanvasElement>document.getElementById("title");
   // make title element fit text exactly, then render it
   title.width = getTextSize(player.xm.songname, _bigfontwidths);
   var ctx = title.getContext('2d');
@@ -249,27 +247,27 @@ function init() {
   }
   var instrcols = ((player.xm.instruments.length + 7) / 8) | 0;
   for (var i = 0; i < instrcols; i++) {
-    var canvas = document.createElement('canvas');
+    const canvas = document.createElement('canvas');
     ctx = canvas.getContext('2d');
-    var instrcolumnwidth = 8*22;
+    const instrcolumnwidth = 8*22;
     canvas.width = instrcolumnwidth;
     canvas.height = 8 * 10;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    var hasname = 0, hasdata = 0;
-    for (var j = 8*i; j < Math.min(8*i+8, player.xm.instruments.length); j++) {
-      var y = 10*(j - 8*i);
-      var n = (j+1).toString(16);
+    let hasname = 0, hasdata = 0;
+    for (let j = 8*i; j < Math.min(8*i+8, player.xm.instruments.length); j++) {
+      const y = 10*(j - 8*i);
+      let n = (j+1).toString(16);
       if (j < 15) n = '0' + n;
-      var data = player.xm.instruments[j].samples;
+      let data = player.xm.instruments[j].samples;
       if (data) {
-        var len = data[0].len;
-        data = data[0].sampledata;
-        var scale = Math.ceil(len / instrcolumnwidth);
+        const len = data[0].len;
+        const sample = data[0].sampledata;
+        const scale = Math.ceil(len / instrcolumnwidth);
         ctx.strokeStyle = '#55acff';
         ctx.beginPath();
-        for (var k = 0; k < Math.min(len / scale, instrcolumnwidth - 20); k++) {
-          ctx.lineTo(k + 20, y + data[k*scale] * 4 + 4);
+        for (let k = 0; k < Math.min(len / scale, instrcolumnwidth - 20); k++) {
+          ctx.lineTo(k + 20, y + sample[k*scale] * 4 + 4);
         }
         ctx.stroke();
         hasdata++;
@@ -288,9 +286,10 @@ function init() {
     }
   }
 
-  document.getElementById('vu').width = _pattern_border +
-    _pattern_cellwidth * player.xm.nchan;
-  var gfxpattern = document.getElementById("gfxpattern");
+  const canvas =  <HTMLCanvasElement>document.getElementById('vu');
+  canvas.width = _pattern_border + _pattern_cellwidth * player.xm.nchan;
+  
+  var gfxpattern = <HTMLCanvasElement>document.getElementById("gfxpattern");
   gfxpattern.width = _pattern_cellwidth * player.xm.nchan + _pattern_border;
 
   // generate a fake audio event to render the initial paused screen
