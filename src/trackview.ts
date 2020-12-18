@@ -1,11 +1,15 @@
+ class AudioEvent {
+  t: number
+  row: number
+  pat: number // player.xm.songpats[0],
+  vu: Float32Array //new Float32Array(player.xm.nchan),
+  scopes: Array<Float32Array>
+}
+
 (function (window, document) {
 
-var player = window.XMPlayer;
-
-if (!window.XMView) {
-  window.XMView = {};
-}
-var view = window.XMView;
+const player = window.XMPlayer; 
+const view = window.XMView;
 
 const _pattern_cellwidth = 16 + 4 + 8 + 4 + 8 + 16 + 4;
 const _scope_width = _pattern_cellwidth - 1;
@@ -19,21 +23,21 @@ view.stop = stop;
 view.scope_width = _scope_width;
 
 // Load font (ripped from FastTracker 2)
-var fontimg = new window.Image();
+const fontimg = new window.Image();
 fontimg.src = "ft2font.png";
 
-var _fontmap_notes = [8*5, 8*22, 8*28];
-var pat_canvas_patnum;
+const _fontmap_notes = [8*5, 8*22, 8*28];
+let pat_canvas_patnum: number;
 
-var audio_events;
-var paused_events;
-var shown_row;
+let audio_events: Array<AudioEvent>;
+let paused_events: Array<AudioEvent>;
+let shown_row: number;
 
 // canvas to render patterns onto
-var pat_canvas = document.createElement('canvas');
+const pat_canvas = document.createElement('canvas');
 
 // pixel widths of each character in the proportional font
-var _fontwidths = [
+const _fontwidths = [
   4, 7, 3, 6, 6, 6, 6, 5, 4, 5, 5, 5, 5, 5, 7, 7,
   5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 6, 7, 7, 7, 7, 7,
   4, 2, 5, 7, 7, 7, 7, 3, 4, 4, 6, 6, 3, 6, 2, 7,
@@ -43,7 +47,7 @@ var _fontwidths = [
   3, 6, 6, 6, 6, 6, 4, 6, 6, 2, 4, 6, 2, 8, 6, 6,
   6, 6, 4, 6, 4, 6, 7, 8, 7, 6, 6, 4, 2, 4, 4, 4];
 
-var _bigfontwidths = [
+const _bigfontwidths = [
    4, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
   15, 15, 15, 15, 15, 15, 15, 15, 13, 13, 13, 15, 15, 15, 15, 15,
    4,  5, 12, 16, 15, 15, 16,  5,  8,  8, 13, 10,  6, 10,  5, 12,
@@ -55,76 +59,76 @@ var _bigfontwidths = [
 
 // draw FT2 proportional font text to a drawing context
 // returns width rendered
-function drawText(text, dx, dy, ctx) {
-  var dx0 = dx;
-  for (var i = 0; i < text.length; i++) {
-    var n = text.charCodeAt(i);
-    var sx = (n&63)*8;
-    var sy = (n>>6)*10 + 56;
-    var width = _fontwidths[n];
+function drawText(text: string, dx: number, dy: number, ctx: CanvasRenderingContext2D) {
+  const dx0 = dx;
+  for (let i = 0; i < text.length; i++) {
+    const n = text.charCodeAt(i);
+    const sx = (n&63)*8;
+    const sy = (n>>6)*10 + 56;
+    const width = _fontwidths[n];
     ctx.drawImage(fontimg, sx, sy, width, 10, dx, dy, width, 10);
     dx += width + 1;
   }
   return dx - dx0;
 }
 
-function getTextSize(text, widthtable) {
-  var width = 0;
-  for (var i = 0; i < text.length; i++) {
-    var n = text.charCodeAt(i);
+function getTextSize(text: string, widthtable: number[]) {
+  let width = 0;
+  for (let i = 0; i < text.length; i++) {
+    const n = text.charCodeAt(i);
     width += widthtable[n] + 1;
   }
   return width;
 }
 
-function drawBigText(text, dx, dy, ctx) {
-  var dx0 = dx;
-  for (var i = 0; i < text.length; i++) {
-    var n = text.charCodeAt(i);
-    var sx = (n&31)*16;
-    var sy = (n>>5)*20 + 96;
-    var width = _bigfontwidths[n];
+function drawBigText(text: string, dx: number, dy: number, ctx: CanvasRenderingContext2D) {
+  const dx0 = dx;
+  for (let i = 0; i < text.length; i++) {
+    const n = text.charCodeAt(i);
+    const sx = (n&31)*16;
+    const sy = (n>>5)*20 + 96;
+    const width = _bigfontwidths[n];
     ctx.drawImage(fontimg, sx, sy, width, 20, dx, dy, width, 20);
     dx += width + 1;
   }
   return dx - dx0;
 }
 
-function RenderPattern(canv, pattern) {
+function RenderPattern(canv: HTMLCanvasElement, pattern: string | any[]) {
   // a pattern consists of NxM cells which look like
   // N-O II VV EFF
-  var cellwidth = _pattern_cellwidth;
+  const cellwidth = _pattern_cellwidth;
   canv.width = pattern[0].length * cellwidth + _pattern_border;
   canv.height = pattern.length * 8;
-  var ctx = canv.getContext('2d');
-  ctx.fillcolor='#000';
+  const ctx =  canv.getContext('2d');
   ctx.fillRect(0, 0, canv.width, canv.height);
-  for (var j = 0; j < pattern.length; j++) {
-    var row = pattern[j];
-    var dy = j * 8;
+
+  for (let j = 0; j < pattern.length; j++) {
+    const row = pattern[j];
+    const dy = j * 8;
     // render row number
     ctx.drawImage(fontimg, 8*(j>>4), 0, 8, 8, 2, dy, 8, 8);
     ctx.drawImage(fontimg, 8*(j&15), 0, 8, 8, 10, dy, 8, 8);
 
-    for (var i = 0; i < row.length; i++) {
-      var dx = i*cellwidth + 2 + _pattern_border;
-      var data = row[i];
+    for (let i = 0; i < row.length; i++) {
+      let dx = i*cellwidth + 2 + _pattern_border;
+      const data = row[i];
 
       // render note
-      var note = data[0];
+      let note = data[0];
       if (note < 0) {
         // no note = ...
         ctx.drawImage(fontimg, 0, 8*5, 16, 8, dx, dy, 16, 8);
       } else {
-        var octave = (note/12)|0;
-        var note_fontrow = _fontmap_notes[(octave/3)|0];
+        const octave = (note/12)|0;
+        const note_fontrow = _fontmap_notes[(octave/3)|0];
         note = (note % (12*3))|0;
         ctx.drawImage(fontimg, 16+16*note, note_fontrow, 16, 8, dx, dy, 16, 8);
       }
       dx += 20;
 
       // render instrument
-      var inst = data[1];
+      const inst = data[1];
       if (inst != -1) {  // no instrument = render nothing
         if (inst > 15) {
           ctx.drawImage(fontimg, 8*(inst>>4), 4*8, 4, 8, dx, dy, 4, 8);
@@ -134,7 +138,7 @@ function RenderPattern(canv, pattern) {
       dx += 12;
 
       // render volume
-      var vol = data[2];
+      const vol = data[2];
       if (vol < 0x10) {
         // no volume = ..
         ctx.drawImage(fontimg, 312, 0, 8, 8, dx, dy, 8, 8);
@@ -145,8 +149,8 @@ function RenderPattern(canv, pattern) {
       dx += 8;
 
       // render effect
-      var eff = data[3];
-      var effdata = data[4];
+      const eff = data[3];
+      const effdata = data[4];
       if (eff !== 0 || effdata !== 0) {
         // draw effect with tiny font (4px space + effect type 0..9a..z)
         ctx.drawImage(fontimg, 8*eff + 16*8, 4*8, 8, 8, dx, dy, 8, 8);
@@ -163,8 +167,8 @@ function RenderPattern(canv, pattern) {
 }
 
 function redrawScreen() {
-  var e;
-  var t = player.audioctx.currentTime;
+  let e: AudioEvent;
+  const t = player.audioctx.currentTime;
   while (audio_events.length > 0 && audio_events[0].t < t) {
     e = audio_events.shift();
   }
@@ -174,9 +178,9 @@ function redrawScreen() {
     }
     return;
   }
-  var VU = e.vu;
-  var scopes = e.scopes;
-  var ctx;
+  const VU = e.vu;
+  const scopes = e.scopes;
+  let ctx: CanvasRenderingContext2D;
 
   if (e.scopes !== undefined) {
     // update VU meters & oscilliscopes
@@ -186,20 +190,20 @@ function redrawScreen() {
     ctx.fillRect(0, 0, canvas.width, 64);
     ctx.fillStyle = '#0f0';
     ctx.strokeStyle = '#55acff';
-    for (var j = 0; j < player.xm.nchan; j++) {
-      var x = _pattern_border + j * _pattern_cellwidth;
+    for (let j = 0; j < player.xm.nchan; j++) {
+      const x = _pattern_border + j * _pattern_cellwidth;
       // render channel number
       drawText(''+j, x, 1, ctx);
 
       // volume in dB as a green bar
-      var vu_y = -Math.log(VU[j])*10;
+      const vu_y = -Math.log(VU[j])*10;
       ctx.fillRect(x, vu_y, 2, 64-vu_y);
 
       // oscilloscope
-      var scope = scopes[j];
+      const scope = scopes[j];
       if (scope) {
         ctx.beginPath();
-        for (var k = 0; k < _scope_width; k++) {
+        for (let k = 0; k < _scope_width; k++) {
           ctx.lineTo(x + 1 + k, 32 - 16 * scope[k]);
         }
         ctx.stroke();
@@ -209,14 +213,14 @@ function redrawScreen() {
 
   if (e.row != shown_row || e.pat != pat_canvas_patnum) {
     if (e.pat != pat_canvas_patnum) {
-      var p = player.xm.patterns[e.pat];
+      const p = player.xm.patterns[e.pat];
       if (p) {
         RenderPattern(pat_canvas, player.xm.patterns[e.pat]);
         pat_canvas_patnum = e.pat;
       }
     }
 
-    var gfx =  <HTMLCanvasElement>document.getElementById("gfxpattern");
+    const gfx =  <HTMLCanvasElement>document.getElementById("gfxpattern");
     ctx = gfx.getContext('2d');
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, gfx.width, gfx.height);
@@ -234,19 +238,19 @@ function redrawScreen() {
 }
 
 function init() {
-  var title =  <HTMLCanvasElement>document.getElementById("title");
+  const title = <HTMLCanvasElement>document.getElementById("title");
   // make title element fit text exactly, then render it
   title.width = getTextSize(player.xm.songname, _bigfontwidths);
-  var ctx = title.getContext('2d');
+  let ctx = title.getContext('2d');
   drawBigText(player.xm.songname, 0, 1, ctx);
 
-  var instrlist = document.getElementById("instruments");
+  const instrlist = document.getElementById("instruments");
   // clear instrument list if not already clear
   while (instrlist.childNodes.length) {
     instrlist.removeChild(instrlist.childNodes[0]);
   }
-  var instrcols = ((player.xm.instruments.length + 7) / 8) | 0;
-  for (var i = 0; i < instrcols; i++) {
+  const instrcols = ((player.xm.instruments.length + 7) / 8) | 0;
+  for (let i = 0; i < instrcols; i++) {
     const canvas = document.createElement('canvas');
     ctx = canvas.getContext('2d');
     const instrcolumnwidth = 8*22;
@@ -272,7 +276,7 @@ function init() {
         ctx.stroke();
         hasdata++;
       }
-      var name = player.xm.instruments[j].name;
+      const name = player.xm.instruments[j].name;
       ctx.globalCompositeOperation = 'lighten';
       drawText(n, 1, y, ctx);
       if (name !== '') {
@@ -289,12 +293,12 @@ function init() {
   const canvas =  <HTMLCanvasElement>document.getElementById('vu');
   canvas.width = _pattern_border + _pattern_cellwidth * player.xm.nchan;
   
-  var gfxpattern = <HTMLCanvasElement>document.getElementById("gfxpattern");
+  const gfxpattern = <HTMLCanvasElement>document.getElementById("gfxpattern");
   gfxpattern.width = _pattern_cellwidth * player.xm.nchan + _pattern_border;
 
   // generate a fake audio event to render the initial paused screen
-  var scopes = [];
-  for (i = 0; i < player.xm.nchan; i++) {
+  const scopes = [];
+  for (let i = 0; i < player.xm.nchan; i++) {
     scopes.push(new Float32Array(_scope_width));
   }
 
@@ -312,7 +316,7 @@ function init() {
   redrawScreen();
 }
 
-function pushEvent(e) {
+function pushEvent(e: AudioEvent) {
   audio_events.push(e);
   if (audio_events.length == 1) {
     requestAnimationFrame(redrawScreen);
@@ -321,18 +325,18 @@ function pushEvent(e) {
 
 function pause() {
   // grab all the audio events
-  var t = player.audioctx.currentTime;
+  const t = player.audioctx.currentTime;
   while (audio_events.length > 0) {
-    var e = audio_events.shift();
+    const e = audio_events.shift();
     e.t -= t;
     paused_events.push(e);
   }
 }
 
 function resume() {
-  var t = player.audioctx.currentTime;
+  const t = player.audioctx.currentTime;
   while (paused_events.length > 0) {
-    var e = paused_events.shift();
+    const e = paused_events.shift();
     e.t += t;
     audio_events.push(e);
   }
