@@ -1,6 +1,6 @@
 import ChannelInfo from "./ChannelInfo"
 import Envelope from "./Envelope"
-import XM, { AudioContext } from "./XM"
+import XM from "./XM"
 
 export default class XMPlayer {
     xm: XM

@@ -20,13 +20,4 @@ export default class XM {
 
     constructor() {}
 }
-
-export interface AudioContext  { 
-    currentTime: number; 
-    sampleRate: number; 
-    createGain: () => any; 
-    createScriptProcessor: (arg0: number, arg1: number, arg2: number) => any; 
-    createJavaScriptNode: (arg0: number, arg1: number, arg2: number) => any; 
-    destination: any;
-    createOscillator: () => any
- }
+ 

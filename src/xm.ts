@@ -1,4 +1,4 @@
-import  XM, { AudioContext } from './models/XM'
+import  XM  from './models/XM'
 import ChannelInfo from './models/ChannelInfo'
 import Envelope from './models/Envelope'
 import EnvelopeFollower from './models/EnvelopeFollower'
@@ -874,19 +874,25 @@ function load(arrayBuf: ArrayBuffer) {
   console.log("loaded \"" + player.xm.songname + "\"");
   return true;
 }
+ 
 
-let jsNode: { onaudioprocess: (e: any) => void; connect: (arg0: any) => void; disconnect: (arg0: any) => void }, gainNode: { gain: { value: number }; connect: (arg0: any) => void };
+let jsNode: ScriptProcessorNode;
+let gainNode: GainNode;
+
 function init() {
   if (!player.audioctx) {
     let audioContext = window.AudioContext || window.webkitAudioContext;
-    let ctx = new audioContext()
-    player.audioctx = (ctx as any) as AudioContext;
+    let ctx: AudioContext = new audioContext()
+    player.audioctx = ctx;
     gainNode = player.audioctx.createGain();
     gainNode.gain.value = 0.1;  // master volume
   }
   if (player.audioctx.createScriptProcessor === undefined) {
-    jsNode = player.audioctx.createJavaScriptNode(16384, 0, 2);
+    //Fallback for older browsers
+    console.log("Create old js node")
+    jsNode = (player.audioctx as any).createJavaScriptNode(16384, 0, 2);
   } else {
+    console.log("Create new js node")
     jsNode = player.audioctx.createScriptProcessor(16384, 0, 2);
   }
   jsNode.onaudioprocess = audio_cb;
@@ -904,8 +910,8 @@ function play() {
     // hack to get iOS to play anything
     let temp_osc = player.audioctx.createOscillator();
     temp_osc.connect(player.audioctx.destination);
-    !!temp_osc.start ? temp_osc.start(0) : temp_osc.noteOn(0);
-    !!temp_osc.stop ? temp_osc.stop(0) : temp_osc.noteOff(0);
+    !!temp_osc.start ? temp_osc.start(0) : (temp_osc as any).noteOn(0);
+    !!temp_osc.stop ? temp_osc.stop(0) : (temp_osc as any).noteOff(0);
     temp_osc.disconnect();
   }
   player.playing = true;

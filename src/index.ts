@@ -9,6 +9,8 @@ declare global {
     interface Window {
         XMPlayer: XMPlayer;
         XMView: any;
+
+        // Audio constructors
         webkitAudioContext: any;
         AudioContext: any;
      }
