@@ -1,6 +1,6 @@
-import { Envelope } from "./Envelope";
+import Envelope from "./Envelope";
 
-export class EnvelopeFollower {
+export default class EnvelopeFollower {
     env: Envelope;
     tick: number;
   

@@ -1,3 +1,3 @@
-export class Pattern {
+export default  class Pattern {
     
 }

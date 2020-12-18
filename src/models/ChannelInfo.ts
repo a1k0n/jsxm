@@ -1,8 +1,8 @@
-import { Instrument } from './Instrument'
-import { Sample } from './Sample'
-import { EnvelopeFollower } from './EnvelopeFollower'
+import Instrument from './Instrument'
+import Sample  from './Sample'
+import EnvelopeFollower from './EnvelopeFollower'
 
-export class ChannelInfo {
+export default class ChannelInfo {
     constructor(data: Partial<ChannelInfo>) {
         Object.assign(this, data);
     }

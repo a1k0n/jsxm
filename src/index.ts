@@ -3,7 +3,7 @@ import "./trackview";
 import "./xm";
 import "./xmeffects";
 
-import { XMPlayer} from "./models/XMPlayer"
+import XMPlayer from "./models/XMPlayer"
 
 declare global {
     interface Window {

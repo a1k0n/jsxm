@@ -1,3 +1,6 @@
+
+import XMPlayer from "./models/XMPlayer"
+
 (function (window, document) {
 if (!window.XMPlayer) {
   window.XMPlayer = {};

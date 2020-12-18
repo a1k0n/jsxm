@@ -1,4 +1,4 @@
-export class Envelope {
+export default class Envelope {
     points: Array<number>;
     type: number;
     sustain: number;

@@ -1,8 +1,8 @@
-import { ChannelInfo } from './ChannelInfo'
-import { Instrument } from './Instrument'
-import { Pattern } from './Pattern'
+import ChannelInfo from './ChannelInfo'
+import Instrument from './Instrument'
+import Pattern from './Pattern'
 
-export class XM {
+export default class XM {
     global_volume: number
     songpats: Array<number>
     patterns: Array<Array<Array<Pattern>>>
@@ -19,7 +19,6 @@ export class XM {
     global_volumeslide: number
 
     constructor() {}
-
 }
 
 export interface AudioContext  { 

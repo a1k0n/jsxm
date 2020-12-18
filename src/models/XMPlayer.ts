@@ -1,8 +1,8 @@
-import { ChannelInfo } from "./ChannelInfo"
-import { Envelope } from "./Envelope"
-import { XM,AudioContext } from "./XM"
+import ChannelInfo from "./ChannelInfo"
+import Envelope from "./Envelope"
+import XM, { AudioContext } from "./XM"
 
-export class XMPlayer {
+export default class XMPlayer {
     xm: XM
 
     periodForNote:   (ch: ChannelInfo, note: number) => number 

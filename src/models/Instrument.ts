@@ -1,7 +1,7 @@
-import {Envelope} from './Envelope'
-import { Sample } from './Sample'
+import Envelope from './Envelope'
+import Sample from './Sample'
    
-export class Instrument {
+export default class Instrument {
   name: string
   number: number
 

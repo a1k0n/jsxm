@@ -1,4 +1,4 @@
-export class Sample {
+export default class Sample {
     constructor(data: Partial<Sample>){
         Object.assign(this, data);
     }
